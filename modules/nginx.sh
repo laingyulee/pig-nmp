@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+#
+# Pig-NMP - Nginx Module
+#
+
+source "${CONF_DIR}/versions.conf"
+
+_nginx_get_bin() {
+    if [[ -x "${NGINX_DIR}/sbin/nginx" ]]; then
+        echo "${NGINX_DIR}/sbin/nginx"
+    elif is_installed nginx; then
+        which nginx 2>/dev/null
+    fi
+}
+
+nginx_is_installed() {
+    [[ -n "$(_nginx_get_bin)" ]]
+}
+
+nginx_get_version() {
+    local nginx_bin
+    nginx_bin=$(_nginx_get_bin)
+    if [[ -n "$nginx_bin" ]]; then
+        "$nginx_bin" -v 2>&1 | grep -oP '[\d.]+'
+    fi
+}
+
+nginx_install_apt() {
+    local branch="${1:-stable}"
+    require_os
+
+    log_info "Installing Nginx from official APT repository (${branch})..."
+
+    local keyring="/usr/share/keyrings/nginx-archive-keyring.gpg"
+    rm -f "$keyring"
+    curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o "$keyring"
+    chmod 644 "$keyring"
+
+    local repo_line
+    if [[ "$branch" == "mainline" ]]; then
+        repo_line="deb [signed-by=${keyring}] https://nginx.org/packages/mainline/${OS_ID} ${OS_CODENAME} nginx"
+    else
+        repo_line="deb [signed-by=${keyring}] https://nginx.org/packages/${OS_ID} ${OS_CODENAME} nginx"
+    fi
+
+    echo "$repo_line" > /etc/apt/sources.list.d/nginx.list
+
+    apt-get update -qq 2>/dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx 2>/dev/null
+
+    if [[ $? -eq 0 ]]; then
+        log_success "Nginx installed via APT: $(nginx -v 2>&1)"
+    else
+        log_error "Failed to install Nginx via APT"
+        return 1
+    fi
+}
+
+nginx_install_source() {
+    local version="${1:-$NGINX_STABLE_VERSION}"
+    local -a extra_modules=("${@:2}")
+
+    require_os
+    install_build_deps
+    install_deps libpcre2-dev libssl-dev zlib1g-dev
+
+    log_info "Installing Nginx ${version} from source..."
+
+    local url="https://nginx.org/download/nginx-${version}.tar.gz"
+    local src_dir="${TMP_DIR}/nginx-${version}"
+
+    ensure_dirs "$TMP_DIR"
+    download_and_extract "$url" "$src_dir" 1 || return 1
+
+    cd "$src_dir" || return 1
+
+    local -a configure_opts=(
+        --prefix="${INSTALL_PREFIX}/nginx"
+        --conf-path="${NGINX_ETC_DIR}/nginx.conf"
+        --error-log-path="${LOG_DIR}/nginx/error.log"
+        --http-log-path="${LOG_DIR}/nginx/access.log"
+        --pid-path="${RUN_DIR}/nginx.pid"
+        --lock-path=/var/lock/nginx.lock
+        --user=www-data
+        --group=www-data
+        --with-http_ssl_module
+        --with-http_v2_module
+        --with-http_v3_module
+        --with-http_realip_module
+        --with-http_gzip_static_module
+        --with-http_stub_status_module
+        --with-http_sub_module
+        --with-http_flv_module
+        --with-http_mp4_module
+        --with-stream
+        --with-stream_ssl_module
+        --with-stream_realip_module
+        --with-pcre-jit
+        --with-file-aio
+    )
+
+    for mod in "${extra_modules[@]}"; do
+        case "$mod" in
+            http_image_filter)  configure_opts+=(--with-http_image_filter_module) ;;
+            http_geoip)         configure_opts+=(--with-http_geoip_module) ;;
+            http_xslt)          configure_opts+=(--with-http_xslt_module) ;;
+            http_dav)           configure_opts+=(--with-http_dav_module) ;;
+            mail)               configure_opts+=(--with-mail --with-mail_ssl_module) ;;
+        esac
+    done
+
+    log_info "Configuring Nginx ${version}..."
+    ./configure "${configure_opts[@]}" &>/dev/null || {
+        log_error "Nginx configure failed"
+        cd - || return 1
+        return 1
+    }
+
+    log_info "Compiling Nginx (this may take a while)..."
+    make -j"$(nproc)" &>/dev/null || {
+        log_error "Nginx compile failed"
+        cd - || return 1
+        return 1
+    }
+
+    make install &>/dev/null || {
+        log_error "Nginx install failed"
+        cd - || return 1
+        return 1
+    }
+
+    cd - || return 1
+    rm -rf "$src_dir"
+
+    log_success "Nginx ${version} compiled and installed"
+}
+
+nginx_setup_config() {
+    ensure_dirs \
+        "${NGINX_ETC_DIR}" \
+        "${NGINX_SITES_AVAILABLE}" \
+        "${NGINX_SITES_ENABLED}" \
+        "${LOG_DIR}/nginx" \
+        "${RUN_DIR}"
+
+    local nginx_conf="${NGINX_ETC_DIR}/nginx.conf"
+    if [[ ! -f "$nginx_conf" ]] || [[ $(wc -l < "$nginx_conf" 2>/dev/null) -lt 5 ]]; then
+        render_template "${TEMPLATES_DIR}/nginx/nginx.conf.tpl" "$nginx_conf" \
+            NGINX_USER=www-data \
+            NGINX_WORKER_PROCESSES="${CPU_CORES}" \
+            NGINX_ETC_DIR="${NGINX_ETC_DIR}" \
+            NGINX_SITES_ENABLED="${NGINX_SITES_ENABLED}" \
+            RUN_DIR="${RUN_DIR}" \
+            LOG_DIR="${LOG_DIR}"
+    fi
+
+    if [[ ! -d "${NGINX_ETC_DIR}/conf.d" ]]; then
+        mkdir -p "${NGINX_ETC_DIR}/conf.d"
+    fi
+
+    if [[ ! -f "${NGINX_ETC_DIR}/mime.types" ]]; then
+        if [[ -f /etc/nginx/mime.types ]]; then
+            cp -a /etc/nginx/mime.types "${NGINX_ETC_DIR}/mime.types"
+        elif [[ -f "${NGINX_DIR}/conf/mime.types" ]]; then
+            cp -a "${NGINX_DIR}/conf/mime.types" "${NGINX_ETC_DIR}/mime.types"
+        fi
+    fi
+
+    nginx_setup_systemd
+}
+
+nginx_setup_systemd() {
+    local service_file="/etc/systemd/system/nginx.service"
+    if [[ ! -f "$service_file" ]]; then
+        local nginx_bin
+        nginx_bin=$(_nginx_get_bin)
+        if [[ -z "$nginx_bin" ]]; then
+            nginx_bin="${NGINX_DIR}/sbin/nginx"
+        fi
+        render_template "${TEMPLATES_DIR}/systemd/nginx.service.tpl" "$service_file" \
+            NGINX_BIN="${nginx_bin}" \
+            NGINX_ETC_DIR="${NGINX_ETC_DIR}" \
+            NGINX_PID="${RUN_DIR}/nginx.pid"
+        systemctl daemon-reload
+        systemctl enable nginx &>/dev/null
+    fi
+}
+
+nginx_install() {
+    if nginx_is_installed; then
+        log_warn "Nginx is already installed: $(nginx_get_version)"
+        if ! confirm "Reinstall Nginx?"; then
+            return 0
+        fi
+    fi
+
+    echo -e "\n${HEADER_COLOR}Select Nginx installation method:${C_RESET}" >&2
+    echo -e "  ${MENU_NUM_COLOR}1)${C_RESET} APT - Official repository (stable)" >&2
+    echo -e "  ${MENU_NUM_COLOR}2)${C_RESET} APT - Official repository (mainline)" >&2
+    echo -e "  ${MENU_NUM_COLOR}3)${C_RESET} Source compilation" >&2
+    local method_choice
+    read -rp "$(echo -e "${C_CYAN}Enter number [1-3]:${C_RESET} ")" method_choice
+
+    case "$method_choice" in
+        1) nginx_install_apt stable ;;
+        2) nginx_install_apt mainline ;;
+        3)
+            local version
+            prompt_input "Nginx version" "$NGINX_STABLE_VERSION" version
+            nginx_install_source "$version"
+            ;;
+        *)
+            log_error "Invalid choice"
+            return 1
+            ;;
+    esac
+
+    nginx_setup_config
+
+    id www-data &>/dev/null || useradd -r -s /sbin/nologin www-data
+
+    systemctl start nginx &>/dev/null
+    if is_service_active nginx; then
+        log_success "Nginx is running on port 80"
+    else
+        log_error "Nginx failed to start"
+        return 1
+    fi
+}
+
+nginx_uninstall() {
+    if ! nginx_is_installed; then
+        log_warn "Nginx is not installed"
+        return 0
+    fi
+
+    if ! confirm "Uninstall Nginx? This will remove all Nginx files and configurations."; then
+        return 0
+    fi
+
+    systemctl stop nginx &>/dev/null
+    systemctl disable nginx &>/dev/null
+
+    if [[ -x "${INSTALL_PREFIX}/nginx/sbin/nginx" ]]; then
+        rm -rf "${INSTALL_PREFIX}/nginx"
+    fi
+
+    if is_installed nginx && dpkg -l nginx &>/dev/null; then
+        apt_remove nginx nginx-common nginx-full
+    fi
+
+    rm -f /etc/systemd/system/nginx.service
+    rm -f /etc/apt/sources.list.d/nginx.list
+    systemctl daemon-reload
+
+    if confirm "Remove Nginx configuration files?"; then
+        rm -rf "${NGINX_ETC_DIR}"
+    fi
+
+    log_success "Nginx uninstalled"
+}
+
+nginx_test_config() {
+    local nginx_bin
+    nginx_bin=$(_nginx_get_bin)
+    if [[ -n "$nginx_bin" ]]; then
+        "$nginx_bin" -t -c "${NGINX_ETC_DIR}/nginx.conf" 2>&1
+    fi
+}
+
+nginx_reload() {
+    if nginx_test_config &>/dev/null; then
+        systemctl reload nginx &>/dev/null
+        log_success "Nginx reloaded"
+    else
+        log_error "Nginx configuration test failed, not reloading"
+        nginx_test_config
+        return 1
+    fi
+}
+
+nginx_status() {
+    echo -e "\n${HEADER_COLOR}=== Nginx Status ===${C_RESET}"
+    print_status "Nginx" "$(nginx_is_installed && echo 'installed' || echo 'not_installed')"
+    if nginx_is_installed; then
+        print_status "Version" "$(nginx_get_version)"
+        print_status "Service" "$(is_service_active nginx && echo 'running' || echo 'stopped')"
+        print_status "Config" "$(nginx_test_config &>/dev/null && echo 'OK' || echo 'ERROR')"
+        print_status "Port 80" "$(port_in_use 80 && echo 'in_use' || echo 'free')"
+    fi
+}
+
+nginx_menu() {
+    while true; do
+        echo -e "\n${HEADER_COLOR}=== Nginx Management ===${C_RESET}"
+        echo -e "  ${MENU_NUM_COLOR}1)${C_RESET} Install Nginx"
+        echo -e "  ${MENU_NUM_COLOR}2)${C_RESET} Uninstall Nginx"
+        echo -e "  ${MENU_NUM_COLOR}3)${C_RESET} Start/Stop/Restart"
+        echo -e "  ${MENU_NUM_COLOR}4)${C_RESET} Reload Configuration"
+        echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Test Configuration"
+        echo -e "  ${MENU_NUM_COLOR}6)${C_RESET} Status"
+        echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
+        echo ""
+
+        local choice
+        read -rp "$(echo -e "${C_CYAN}Enter choice:${C_RESET} ")" choice
+
+        case "$choice" in
+            1) nginx_install ;;
+            2) nginx_uninstall ;;
+            3)
+                local action
+                action=$(prompt_select "Service action:" "Start" "Stop" "Restart")
+                case "$action" in
+                    Start)   systemctl start nginx ;;
+                    Stop)    systemctl stop nginx ;;
+                    Restart) systemctl restart nginx ;;
+                esac
+                ;;
+            4) nginx_reload ;;
+            5) nginx_test_config ;;
+            6) nginx_status ;;
+            0) return 0 ;;
+            *) log_warn "Invalid choice" ;;
+        esac
+    done
+}
