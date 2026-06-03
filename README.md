@@ -130,25 +130,25 @@ sudo bash pig-nmp.sh
 首次运行将显示交互式主菜单：
 
 ```
-  ____  _   __  ____
- |  _ \(_) / /_|  _ \
- | |_) | ||_  /| |_) |
- |  __/| | / / |  __/
- |_|   |_|/___||_|
-     _   _ ____  __  __    _    ____ _____
-    | \ | |  _ \|  \/  |  / \  / ___| ____|
-    |  \| | | | | |\/| | / _ \| |   |  _|
-    | |\  | |_| | |  | |/ ___ \ |___| |___
-    |_| \_|____/|_|  |_/_/   \_\____|_____|
+ ___ ___ ___     _       _                  _   _
+ | _ \_ _/ __|   /_\ _  _| |_ ___ _ __  __ _| |_(_)___ _ _
+ |  _/| | (_ |  / _ \ || |  _/ _ \ '  \/ _` |  _| / _ \ ' \
+ |_| |___\___| /_/ \_\_,_|\__\___/_|_|_\__,_|\__|_\___/_||_|
+                                                                                                                        
 
   Nginx + MySQL/MariaDB + PHP Environment Manager
   Version 1.0.0
 
   Component Status:
-  ○ Nginx (not installed)
-  ○ PHP (not installed)
-  ○ MySQL/MariaDB (not installed)
-  ...
+  ● Nginx 1.30.2
+  ● PHP 8.3
+  ● MARIADB
+  ● Redis 8.8.0
+  ○ Memcached (not installed)
+  ○ phpMyAdmin (not installed)
+  ○ FTP (not installed)
+
+========================================================================================================================
 
   1)  Install/Update Components
   2)  Manage Virtual Hosts
@@ -160,6 +160,8 @@ sudo bash pig-nmp.sh
   8)  Uninstall Components
 
   0)  Exit
+
+Enter choice:
 ```
 
 ### 3. 一键安装 NMP 环境
