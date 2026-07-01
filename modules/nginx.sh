@@ -239,6 +239,10 @@ nginx_install() {
         log_error "Nginx failed to start"
         return 1
     fi
+
+    if confirm "Set up default site (catch-all for IP/unconfigured domains)?" "y"; then
+        nginx_default_site_enable
+    fi
 }
 
 nginx_uninstall() {
@@ -270,7 +274,89 @@ nginx_uninstall() {
         rm -rf "${NGINX_ETC_DIR}"
     fi
 
+    if confirm "Remove default site directory (/home/www/default)?"; then
+        rm -rf "/home/www/default"
+    fi
+
     log_success "Nginx uninstalled"
+}
+
+nginx_default_site_enable() {
+    local default_conf="${NGINX_ETC_DIR}/conf.d/default.conf"
+
+    ensure_dirs "/home/www/default"
+
+    if [[ ! -f "/home/www/default/index.html" ]]; then
+        cat > "/home/www/default/index.html" << 'HTML'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Default Site</title>
+</head>
+<body>
+<h1>Hello World</h1>
+<p>Powered by Pig-NMP</p>
+</body>
+</html>
+HTML
+    fi
+
+    render_template "${TEMPLATES_DIR}/nginx/default.conf.tpl" "$default_conf" \
+        LOG_DIR="${LOG_DIR}"
+
+    log_success "Default site enabled (catch-all for IP/unconfigured domains)"
+    nginx_reload
+}
+
+nginx_default_site_disable() {
+    rm -f "${NGINX_ETC_DIR}/conf.d/default.conf"
+    log_success "Default site disabled"
+    nginx_reload
+}
+
+nginx_default_site_status() {
+    [[ -f "${NGINX_ETC_DIR}/conf.d/default.conf" ]]
+}
+
+nginx_default_site_menu() {
+    while true; do
+        local status_text
+        if nginx_default_site_status; then
+            status_text="${C_GREEN}enabled${C_RESET}"
+        else
+            status_text="${C_RED}disabled${C_RESET}"
+        fi
+
+        echo -e "\n${HEADER_COLOR}=== Default Site Management ===${C_RESET}"
+        echo -e "  Status: ${status_text}"
+        echo -e "  Document root: ${C_CYAN}/home/www/default${C_RESET}"
+        echo ""
+        echo -e "  ${MENU_NUM_COLOR}1)${C_RESET} Enable Default Site"
+        echo -e "  ${MENU_NUM_COLOR}2)${C_RESET} Disable Default Site"
+        echo -e "  ${MENU_NUM_COLOR}3)${C_RESET} Show Status"
+        echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
+        echo ""
+
+        local choice
+        read -rp "$(echo -e "${C_CYAN}Enter choice:${C_RESET} ")" choice
+
+        case "$choice" in
+            1) nginx_default_site_enable ;;
+            2) nginx_default_site_disable ;;
+            3)
+                if nginx_default_site_status; then
+                    log_info "Default site is enabled"
+                    echo -e "  Config: ${C_CYAN}${NGINX_ETC_DIR}/conf.d/default.conf${C_RESET}"
+                    echo -e "  Root:   ${C_CYAN}/home/www/default${C_RESET}"
+                else
+                    log_info "Default site is disabled"
+                fi
+                ;;
+            0) return 0 ;;
+            *) log_warn "Invalid choice" ;;
+        esac
+    done
 }
 
 nginx_test_config() {
@@ -312,6 +398,7 @@ nginx_menu() {
         echo -e "  ${MENU_NUM_COLOR}4)${C_RESET} Reload Configuration"
         echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Test Configuration"
         echo -e "  ${MENU_NUM_COLOR}6)${C_RESET} Status"
+        echo -e "  ${MENU_NUM_COLOR}7)${C_RESET} Default Site (catch-all)"
         echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
         echo ""
 
@@ -333,6 +420,7 @@ nginx_menu() {
             4) nginx_reload ;;
             5) nginx_test_config ;;
             6) nginx_status ;;
+            7) nginx_default_site_menu ;;
             0) return 0 ;;
             *) log_warn "Invalid choice" ;;
         esac
