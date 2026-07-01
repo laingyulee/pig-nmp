@@ -330,7 +330,12 @@ vhost_patch_php_block() {
         fastcgi_intercept_errors on;
     }"
         fi
-        sed_inplace "$vhost_file" "s|PHP_LOCATION_BLOCK|${php_block}|"
+        local tmp_php_block
+        tmp_php_block=$(mktemp)
+        printf '%s\n' "$php_block" > "$tmp_php_block"
+        sed -i "/PHP_LOCATION_BLOCK/{r $tmp_php_block
+d}" "$vhost_file"
+        rm -f "$tmp_php_block"
     fi
 }
 

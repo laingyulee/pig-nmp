@@ -296,7 +296,11 @@ vhost_apply_rewrite() {
     esac
 
     if [[ -n "$rewrite_rules" ]]; then
-        sed_inplace "$vhost_file" "/# REWRITE_RULES_MARKER/a\\${rewrite_rules}"
+        local tmp_rewrite
+        tmp_rewrite=$(mktemp)
+        printf '%s\n' "$rewrite_rules" > "$tmp_rewrite"
+        sed -i "/# REWRITE_RULES_MARKER/r $tmp_rewrite" "$vhost_file"
+        rm -f "$tmp_rewrite"
         log_info "Rewrite rules applied: ${framework}"
     fi
 }
