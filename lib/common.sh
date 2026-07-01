@@ -179,13 +179,15 @@ wait_enter() {
 
 gen_password() {
     local len="${1:-16}"
-    local pass=""
-    pass=$(tr -dc 'A-Za-z0-9!@#%&*' < /dev/urandom 2>/dev/null | head -c "$len") && \
-    [[ -n "$pass" ]] || \
-    pass=$(cat /dev/urandom 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9!@#%&*' 2>/dev/null | head -c "$len")
-    [[ -n "$pass" ]] || pass=$(openssl rand -base64 48 2>/dev/null | tr -dc 'A-Za-z0-9!@#%&*' | head -c "$len")
-    [[ -n "$pass" ]] || pass=$(date +%s%N | sha256sum 2>/dev/null | head -c "$len")
-    echo "${pass}"
+    local pass
+    pass=$(tr -dc 'A-Za-z0-9!@#%&*' < /dev/urandom 2>/dev/null | head -c "$len") || true
+    if [[ -z "$pass" ]]; then
+        pass=$(openssl rand -base64 48 2>/dev/null | tr -dc 'A-Za-z0-9!@#%&*' | head -c "$len") || true
+    fi
+    if [[ -z "$pass" ]]; then
+        pass=$(date +%s%N 2>/dev/null | sha256sum 2>/dev/null | head -c "$len") || true
+    fi
+    echo "$pass"
 }
 
 version_compare() {
