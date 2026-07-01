@@ -62,4 +62,6 @@ PHP_LOCATION_BLOCK
         access_log off;
         log_not_found off;
     }
+
+    include /etc/pig-nmp/nginx/conf.d/phpmyadmin.conf;
 }
