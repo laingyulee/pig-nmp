@@ -269,7 +269,10 @@ render_template() {
         local key="${1%%=*}"
         local val="${1#*=}"
         local escaped_val
-        escaped_val=$(printf '%s\n' "$val" | sed 's/[&/\]/\\&/g')
+        escaped_val="${val//\\/\\\\}"
+        escaped_val="${escaped_val//\$/\\$}"
+        escaped_val="${escaped_val//\`/\\\`}"
+        escaped_val="${escaped_val//\}/\\\}}"
         content="${content//\{\{${key}\}\}/${escaped_val}}"
         shift
     done
