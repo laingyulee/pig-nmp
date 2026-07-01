@@ -43,8 +43,35 @@ pma_install() {
     fi
 
     local version="${1:-$PHPMYADMIN_VERSION}"
-    local url="https://files.phpmyadmin.net/phpMyAdmin/${version}/phpMyAdmin-${version}-all-languages.tar.xz"
 
+    echo -e "\n${HEADER_COLOR}phpMyAdmin Access Configuration:${C_RESET}"
+    local access_type
+    access_type=$(prompt_select "Access method:" "Subdomain (e.g., pma.example.com)" "URL path (e.g., example.com/pma)")
+
+    local pma_domain="" pma_path="" pma_allowed_ip="" pma_auth_user="" pma_auth_pass=""
+    case "$access_type" in
+        Subdomain*)
+            local subdomain
+            prompt_input "Subdomain for phpMyAdmin" "pma" subdomain
+            pma_domain="${subdomain}.$(get_ip)"
+            prompt_input "Full domain" "$pma_domain" pma_domain
+            ;;
+        URL\ path*)
+            prompt_input "URL path" "/pma" pma_path
+            ;;
+    esac
+
+    echo -e "\n${HEADER_COLOR}Security Configuration:${C_RESET}"
+    if confirm "Set up IP whitelist for phpMyAdmin?" "y"; then
+        prompt_input "Allowed IP (or CIDR, e.g., 192.168.1.0/24)" "$(get_ip)/32" pma_allowed_ip
+    fi
+
+    if confirm "Set up HTTP Basic Auth for phpMyAdmin?" "y"; then
+        prompt_input "Auth username" "admin" pma_auth_user
+        prompt_password "Auth password" pma_auth_pass
+    fi
+
+    local url="https://files.phpmyadmin.net/phpMyAdmin/${version}/phpMyAdmin-${version}-all-languages.tar.xz"
     log_info "Installing phpMyAdmin ${version}..."
     ensure_dirs "$TMP_DIR" "${PHPMYADMIN_DIR}"
 
@@ -55,37 +82,18 @@ pma_install() {
 
     pma_setup_config
 
-    echo -e "\n${HEADER_COLOR}phpMyAdmin Access Configuration:${C_RESET}"
-    local access_type
-    access_type=$(prompt_select "Access method:" "Subdomain (e.g., pma.example.com)" "URL path (e.g., example.com/pma)")
-
-    case "$access_type" in
-        Subdomain*)
-            local domain
-            prompt_input "Subdomain for phpMyAdmin" "pma" domain
-            local full_domain="${domain}.$(get_ip)"
-            prompt_input "Full domain" "$full_domain" full_domain
-            pma_setup_vhost_subdomain "$full_domain"
-            ;;
-        URL\ path*)
-            local path
-            prompt_input "URL path" "/pma" path
-            pma_setup_vhost_path "$path"
-            ;;
-    esac
-
-    echo -e "\n${HEADER_COLOR}Security Configuration:${C_RESET}"
-    if confirm "Set up IP whitelist for phpMyAdmin?" "y"; then
-        local allowed_ip
-        prompt_input "Allowed IP (or CIDR, e.g., 192.168.1.0/24)" "$(get_ip)/32" allowed_ip
-        pma_setup_ip_whitelist "$allowed_ip"
+    if [[ -n "$pma_domain" ]]; then
+        pma_setup_vhost_subdomain "$pma_domain"
+    elif [[ -n "$pma_path" ]]; then
+        pma_setup_vhost_path "$pma_path"
     fi
 
-    if confirm "Set up HTTP Basic Auth for phpMyAdmin?" "y"; then
-        local auth_user auth_pass
-        prompt_input "Auth username" "admin" auth_user
-        prompt_password "Auth password" auth_pass
-        pma_setup_basic_auth "$auth_user" "$auth_pass"
+    if [[ -n "$pma_allowed_ip" ]]; then
+        pma_setup_ip_whitelist "$pma_allowed_ip"
+    fi
+
+    if [[ -n "$pma_auth_user" && -n "$pma_auth_pass" ]]; then
+        pma_setup_basic_auth "$pma_auth_user" "$pma_auth_pass"
     fi
 
     nginx_reload

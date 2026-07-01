@@ -215,6 +215,11 @@ nginx_install() {
     local method_choice
     read -rp "$(echo -e "${C_CYAN}Enter number [1-3]:${C_RESET} ")" method_choice
 
+    local setup_default_site=false
+    if confirm "Set up default site (catch-all for IP/unconfigured domains)?" "y"; then
+        setup_default_site=true
+    fi
+
     case "$method_choice" in
         1) nginx_install_apt stable ;;
         2) nginx_install_apt mainline ;;
@@ -242,7 +247,7 @@ nginx_install() {
         return 1
     fi
 
-    if confirm "Set up default site (catch-all for IP/unconfigured domains)?" "y"; then
+    if $setup_default_site; then
         nginx_default_site_enable
     fi
 }
@@ -301,7 +306,8 @@ nginx_default_site_enable() {
 html,body{height:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#0f0f14 0%,#1a1a24 50%,#0f0f14 100%);display:flex;align-items:center;justify-content:center;color:#e8e8ee;line-height:1.6}
 .card{text-align:center;padding:60px 48px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:20px;backdrop-filter:blur(12px);max-width:420px;width:90%}
-.logo{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#d4a147,#e8b860);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:22px;font-weight:700;color:#0f0f14;font-family:Georgia,serif}
+.logo{margin:0 auto 24px;width:72px;height:72px}
+.logo svg{width:100%;height:100%}
 h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
 p{color:#92929e;font-size:15px}
 .tag{display:inline-block;margin-top:24px;padding:4px 14px;border-radius:100px;background:rgba(212,161,71,.1);border:1px solid rgba(212,161,71,.2);font-size:12px;font-weight:500;color:#d4a147;letter-spacing:.04em;text-transform:uppercase}
@@ -311,7 +317,24 @@ p{color:#92929e;font-size:15px}
 </head>
 <body>
 <div class="card">
-<div class="logo">P</div>
+<div class="logo">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<ellipse cx="50" cy="58" rx="36" ry="30" fill="#d4a147"/>
+<ellipse cx="50" cy="62" rx="28" ry="12" fill="#e8b860"/>
+<ellipse cx="22" cy="48" rx="9" ry="15" fill="#d4a147" transform="rotate(-20 22 48)"/>
+<ellipse cx="78" cy="48" rx="9" ry="15" fill="#d4a147" transform="rotate(20 78 48)"/>
+<circle cx="35" cy="44" r="3.5" fill="#0f0f14"/>
+<circle cx="65" cy="44" r="3.5" fill="#0f0f14"/>
+<circle cx="37" cy="42.5" r="1.2" fill="#fff" opacity=".6"/>
+<circle cx="67" cy="42.5" r="1.2" fill="#fff" opacity=".6"/>
+<ellipse cx="44" cy="54" rx="3" ry="2" fill="#b8872a"/>
+<ellipse cx="56" cy="54" rx="3" ry="2" fill="#b8872a"/>
+<path d="M50 56 Q53 62 50 66" stroke="#b8872a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+<path d="M45 70 Q50 75 55 70" stroke="#b8872a" stroke-width="2" fill="none" stroke-linecap="round"/>
+<ellipse cx="42" cy="60" rx="2" ry="1" fill="#b8872a" opacity=".5"/>
+<ellipse cx="58" cy="60" rx="2" ry="1" fill="#b8872a" opacity=".5"/>
+</svg>
+</div>
 <h1>Hello World</h1>
 <p>Powered by Pig-NMP</p>
 <div class="tag"><span class="dot"></span>Server Ready</div>

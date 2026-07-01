@@ -29,6 +29,14 @@ ftp_install() {
     local method
     method=$(prompt_select "Installation method:" "APT (recommended)" "Source compilation")
 
+    local ftp_passive=false ftp_ssl=false
+    if confirm "Configure passive mode for FTP?" "y"; then
+        ftp_passive=true
+    fi
+    if confirm "Enable FTP over TLS/SSL?" "n"; then
+        ftp_ssl=true
+    fi
+
     case "$method" in
         "APT"*)
             log_info "Installing vsftpd via APT..."
@@ -43,11 +51,11 @@ ftp_install() {
     ftp_setup_config
     ftp_setup_systemd
 
-    if confirm "Configure passive mode for FTP?" "y"; then
+    if $ftp_passive; then
         ftp_configure_passive
     fi
 
-    if confirm "Enable FTP over TLS/SSL?" "n"; then
+    if $ftp_ssl; then
         ftp_setup_ssl
     fi
 
