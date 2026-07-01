@@ -95,7 +95,7 @@ manager_quick_install() {
     fi
 
     local db_type
-    db_type=$(prompt_select "Select database:" "MySQL 8.0" "MariaDB 10.11")
+    db_type=$(prompt_select "Select database:" "MariaDB 10.11" "MySQL 8.0")
 
     local php_method
     php_method=$(prompt_select "Select PHP installation method:" "APT - SURY repository (fast)" "Source compilation")
