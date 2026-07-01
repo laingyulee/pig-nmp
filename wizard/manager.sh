@@ -99,45 +99,70 @@ manager_quick_install() {
     local db_type="${db_sel% *}"
     local db_version="${db_sel#* }"
 
+    local db_password
+    echo -e "\n${HEADER_COLOR}Set ${db_type} root password${C_RESET}"
+    prompt_password "Root password (leave empty for auto-generated)" db_password
+    if [[ -z "$db_password" ]]; then
+        db_password=$(gen_password 20)
+        log_info "Generated root password: ${C_BOLD}${db_password}${C_RESET}"
+    fi
+
     local php_method
     php_method=$(prompt_select "Select PHP installation method:" "APT - SURY repository (fast)" "Source compilation")
 
     log_info "Starting quick NMP stack installation..."
     ensure_dirs "${LOG_DIR}" "${RUN_DIR}" "${DATA_DIR}" "${ETC_DIR}" "${BACKUP_DIR}"
 
+    local step_ok=true
+
     if ! nginx_is_installed; then
         log_info "[1/3] Installing Nginx..."
-        nginx_install_apt stable
-        nginx_setup_config
-        systemctl start nginx &>/dev/null
+        nginx_install_apt stable || { log_error "Nginx install failed"; step_ok=false; }
+        if $step_ok; then
+            nginx_setup_config
+            systemctl start nginx &>/dev/null
+        fi
     fi
 
     if ! php_is_installed "$PHP_VERSION_DEFAULT"; then
         log_info "[2/3] Installing PHP ${PHP_VERSION_DEFAULT}..."
         case "$php_method" in
-            *APT*|*SURY*) php_install_apt "$PHP_VERSION_DEFAULT" ;;
-            *Source*)     php_install_source "$PHP_VERSION_DEFAULT" ;;
+            *APT*|*SURY*)
+                php_install_apt "$PHP_VERSION_DEFAULT" || {
+                    log_warn "APT install failed, trying source compilation..."
+                    php_install_source "$PHP_VERSION_DEFAULT" || { log_error "PHP ${PHP_VERSION_DEFAULT} install failed"; step_ok=false; }
+                }
+                ;;
+            *Source*)
+                php_install_source "$PHP_VERSION_DEFAULT" || { log_error "PHP ${PHP_VERSION_DEFAULT} install failed"; step_ok=false; }
+                ;;
         esac
     fi
 
-    case "$db_type" in
-        MySQL)
-            if ! mysql_is_installed; then
-                log_info "[3/3] Installing MySQL ${db_version}..."
-                mysql_install_mysql "$db_version"
-            fi
-            ;;
-        MariaDB)
-            if ! mysql_is_installed; then
-                log_info "[3/3] Installing MariaDB ${db_version}..."
-                mysql_install_mariadb "$db_version"
-            fi
-            ;;
-    esac
+    if $step_ok; then
+        case "$db_type" in
+            MySQL)
+                if ! mysql_is_installed; then
+                    log_info "[3/3] Installing MySQL ${db_version}..."
+                    mysql_install_mysql "$db_version" "$db_password" || { log_error "MySQL install failed"; step_ok=false; }
+                fi
+                ;;
+            MariaDB)
+                if ! mysql_is_installed; then
+                    log_info "[3/3] Installing MariaDB ${db_version}..."
+                    mysql_install_mariadb "$db_version" "$db_password" || { log_error "MariaDB install failed"; step_ok=false; }
+                fi
+                ;;
+        esac
+    fi
 
     echo ""
     print_separator
-    log_success "NMP Stack installation complete!"
+    if $step_ok; then
+        log_success "NMP Stack installation complete!"
+    else
+        log_error "NMP Stack installation completed with errors!"
+    fi
     print_separator
 
     manager_services_status

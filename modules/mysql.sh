@@ -185,15 +185,24 @@ mysql_install_mariadb() {
 mysql_secure() {
     echo -e "\n${HEADER_COLOR}=== MySQL/MariaDB Security Setup ===${C_RESET}"
 
-    local root_password
-    prompt_password "Set root password (leave empty for auto-generated)" root_password
+    local root_password="${1:-}"
     if [[ -z "$root_password" ]]; then
-        root_password=$(gen_password 20)
-        log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
+        prompt_password "Set root password (leave empty for auto-generated)" root_password
+        if [[ -z "$root_password" ]]; then
+            root_password=$(gen_password 20)
+            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
+        fi
     fi
 
     local db_type
     db_type=$(mysql_get_type)
+
+    systemctl start mysql mariadb mysqld 2>/dev/null || true
+    local wait_attempts=0
+    while ! mysqladmin ping --silent 2>/dev/null && [[ $wait_attempts -lt 10 ]]; do
+        sleep 2
+        wait_attempts=$((wait_attempts + 1))
+    done
 
     local escaped_password
     escaped_password="${root_password//\'/\\\'}"

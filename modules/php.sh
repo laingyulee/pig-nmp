@@ -8,7 +8,7 @@ source "${CONF_DIR}/versions.conf"
 php_is_installed() {
     local ver="${1:-}"
     if [[ -n "$ver" ]]; then
-        [[ -x "${PHP_BASE_DIR}/php${ver}/bin/php" ]] || is_installed "php${ver}"
+        [[ -x "${PHP_BASE_DIR}/php${ver}/sbin/php-fpm" ]]
     else
         local versions
         versions=$(get_php_versions_installed)

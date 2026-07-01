@@ -45,8 +45,9 @@ nginx_install_apt() {
 
     echo "$repo_line" > /etc/apt/sources.list.d/nginx.list
 
+    systemctl stop nginx 2>/dev/null || true
     apt-get update -qq 2>/dev/null
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx 2>/dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx 2>&1 | grep -iv 'kill:' || true
 
     if [[ $? -eq 0 ]]; then
         log_success "Nginx installed via APT: $(nginx -v 2>&1)"
