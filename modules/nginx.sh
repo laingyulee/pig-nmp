@@ -294,11 +294,28 @@ nginx_default_site_enable() {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Default Site</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#0f0f14 0%,#1a1a24 50%,#0f0f14 100%);display:flex;align-items:center;justify-content:center;color:#e8e8ee;line-height:1.6}
+.card{text-align:center;padding:60px 48px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:20px;backdrop-filter:blur(12px);max-width:420px;width:90%}
+.logo{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#d4a147,#e8b860);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:22px;font-weight:700;color:#0f0f14;font-family:Georgia,serif}
+h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
+p{color:#92929e;font-size:15px}
+.tag{display:inline-block;margin-top:24px;padding:4px 14px;border-radius:100px;background:rgba(212,161,71,.1);border:1px solid rgba(212,161,71,.2);font-size:12px;font-weight:500;color:#d4a147;letter-spacing:.04em;text-transform:uppercase}
+.dot{width:6px;height:6px;border-radius:50%;background:#4caf7d;display:inline-block;margin-right:6px;vertical-align:middle;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
 </head>
 <body>
+<div class="card">
+<div class="logo">P</div>
 <h1>Hello World</h1>
 <p>Powered by Pig-NMP</p>
+<div class="tag"><span class="dot"></span>Server Ready</div>
+</div>
 </body>
 </html>
 HTML
