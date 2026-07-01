@@ -165,6 +165,96 @@ pma_setup_vhost_subdomain() {
     log_info "Don't forget to add DNS record for ${domain}"
 }
 
+pma_save_config() {
+    local path="$1"
+    local php_ver="$2"
+    local fpm_sock="$3"
+    mkdir -p "${ETC_DIR}"
+    cat > "${ETC_DIR}/pma-config" << PMACFG
+PMA_PATH="${path}"
+PMA_PHP_VER="${php_ver}"
+PMA_FPM_SOCK="${fpm_sock}"
+PMACFG
+}
+
+pma_get_config() {
+    local key="$1"
+    local config_file="${ETC_DIR}/pma-config"
+    [[ -f "$config_file" ]] || return 1
+    source "$config_file"
+    case "$key" in
+        path) echo "$PMA_PATH" ;;
+        php_ver) echo "$PMA_PHP_VER" ;;
+        fpm_sock) echo "$PMA_FPM_SOCK" ;;
+    esac
+}
+
+pma_has_config() {
+    [[ -f "${ETC_DIR}/pma-config" ]]
+}
+
+pma_inject_location() {
+    local vhost_file="$1"
+    local pma_path="$2"
+    local fpm_sock="$3"
+
+    sed -i '/^    # PIG-NMP phpMyAdmin start/,/^    # PIG-NMP phpMyAdmin end/d' "$vhost_file"
+
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    head -n -1 "$vhost_file" > "$tmp_file"
+
+    cat >> "$tmp_file" << PMAEOF
+    # PIG-NMP phpMyAdmin start
+    location ${pma_path} {
+        alias ${PHPMYADMIN_DIR};
+        index index.php index.html;
+
+        location ~ ^${pma_path}/(.+\.php)$ {
+            alias ${PHPMYADMIN_DIR};
+            try_files \$uri =404;
+            fastcgi_split_path_info ^${pma_path}/(.+\.php)(/.+)$;
+            fastcgi_pass unix:${fpm_sock};
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME ${PHPMYADMIN_DIR}/\$fastcgi_script_name;
+            fastcgi_param PATH_INFO \$fastcgi_path_info;
+            include fastcgi_params;
+            fastcgi_buffers 16 16k;
+            fastcgi_buffer_size 32k;
+        }
+
+        location ~* ^${pma_path}/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+            alias ${PHPMYADMIN_DIR};
+        }
+    }
+    # PIG-NMP phpMyAdmin end
+PMAEOF
+
+    echo "}" >> "$tmp_file"
+    mv "$tmp_file" "$vhost_file"
+}
+
+pma_remove_location() {
+    local vhost_file="$1"
+    sed -i '/^    # PIG-NMP phpMyAdmin start/,/^    # PIG-NMP phpMyAdmin end/d' "$vhost_file"
+}
+
+pma_inject_location_all() {
+    local pma_path pma_fpm_sock
+    pma_path=$(pma_get_config path) || return 0
+    pma_fpm_sock=$(pma_get_config fpm_sock) || return 0
+
+    for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
+        [[ -f "$vhost" ]] || continue
+        pma_inject_location "$vhost" "$pma_path" "$pma_fpm_sock"
+    done
+
+    if [[ -f "${NGINX_ETC_DIR}/conf.d/default.conf" ]]; then
+        pma_inject_location "${NGINX_ETC_DIR}/conf.d/default.conf" "$pma_path" "$pma_fpm_sock"
+    fi
+}
+
 pma_setup_vhost_path() {
     local path="$1"
     local php_ver
@@ -174,64 +264,28 @@ pma_setup_vhost_path() {
     local fpm_sock
     fpm_sock=$(get_php_fpm_sock "$php_ver")
 
-    local escaped_path="${path//./\\.}"
-    escaped_path="${escaped_path//\*/\\*}"
-    escaped_path="${escaped_path//\+/\\+}"
-    escaped_path="${escaped_path//\?/\\?}"
-    escaped_path="${escaped_path//\(/\\(}"
-    escaped_path="${escaped_path//\)/\\)}"
-    escaped_path="${escaped_path//\{/\\{}"
-    escaped_path="${escaped_path//\}/\\}}"
+    pma_save_config "$path" "$php_ver" "$fpm_sock"
+    pma_inject_location_all
 
-    local pma_include="${NGINX_ETC_DIR}/includes/phpmyadmin.conf"
-    mkdir -p "${NGINX_ETC_DIR}/includes"
-    cat > "$pma_include" << EOF
-location ${path} {
-    alias ${PHPMYADMIN_DIR};
-    index index.php index.html;
-
-    location ~ ^${escaped_path}/(.+\.php)$ {
-        alias ${PHPMYADMIN_DIR};
-        try_files \$uri =404;
-        fastcgi_split_path_info ^${escaped_path}/(.+\.php)(/.+)$;
-        fastcgi_pass unix:${fpm_sock};
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME ${PHPMYADMIN_DIR}/\$fastcgi_script_name;
-        fastcgi_param PATH_INFO \$fastcgi_path_info;
-        include fastcgi_params;
-        fastcgi_buffers 16 16k;
-        fastcgi_buffer_size 32k;
-    }
-
-    location ~* ^${escaped_path}/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
-        alias ${PHPMYADMIN_DIR};
-    }
-}
-EOF
-
-    for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
-        [[ -f "$vhost" ]] || continue
-        sed -i '\|phpmyadmin\.conf|d' "$vhost"
-        sed -i '$i\    include '"${NGINX_ETC_DIR}/includes/phpmyadmin.conf;" "$vhost"
-    done
-
-    log_info "phpMyAdmin path configuration added: ${path}"
+    log_info "phpMyAdmin path configured: ${path}"
 }
 
 pma_setup_ip_whitelist() {
     local allowed_ip="$1"
-    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf)
+    local pma_path
+    pma_path=$(pma_get_config path) || return 0
 
-    for vhost in "${vhost_files[@]}"; do
+    local vhosts=("${NGINX_SITES_ENABLED}"/*.conf)
+    [[ -f "${NGINX_ETC_DIR}/conf.d/default.conf" ]] && vhosts+=("${NGINX_ETC_DIR}/conf.d/default.conf")
+
+    for vhost in "${vhosts[@]}"; do
         [[ -f "$vhost" ]] || continue
         if grep -q "allow.*${allowed_ip}" "$vhost" 2>/dev/null; then
             continue
         fi
-        if [[ "$vhost" == *phpmyadmin.conf ]]; then
-            sed_inplace "$vhost" "/^location /a\\    allow ${allowed_ip};\n    deny all;"
-        else
-            sed_inplace "$vhost" "/server_name/a\\    allow ${allowed_ip};\n    deny all;"
-        fi
+        sed -i "/^    # PIG-NMP phpMyAdmin start/,/^    # PIG-NMP phpMyAdmin end/{
+            /^    location ${pma_path//\//\\/} {/a\        allow ${allowed_ip};\n        deny all;
+        }" "$vhost"
     done
     log_info "IP whitelist set: ${allowed_ip}"
 }
@@ -245,11 +299,17 @@ pma_setup_basic_auth() {
     htpasswd -bc "$htpasswd_file" "$user" "$pass" 2>/dev/null
     chmod 640 "$htpasswd_file"
 
-    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf)
-    for vhost in "${vhost_files[@]}"; do
-        if [[ -f "$vhost" ]] && ! grep -q "auth_basic" "$vhost" 2>/dev/null; then
-            sed_inplace "$vhost" "/location.*php/a\\        auth_basic \"phpMyAdmin Login\";\n        auth_basic_user_file ${htpasswd_file};"
+    local vhosts=("${NGINX_SITES_ENABLED}"/*.conf)
+    [[ -f "${NGINX_ETC_DIR}/conf.d/default.conf" ]] && vhosts+=("${NGINX_ETC_DIR}/conf.d/default.conf")
+
+    for vhost in "${vhosts[@]}"; do
+        [[ -f "$vhost" ]] || continue
+        if grep -q "auth_basic" "$vhost" 2>/dev/null; then
+            continue
         fi
+        sed -i "/^    # PIG-NMP phpMyAdmin start/,/^    # PIG-NMP phpMyAdmin end/{
+            /^    location .* {$/a\        auth_basic \"phpMyAdmin Login\";\n        auth_basic_user_file ${htpasswd_file};
+        }" "$vhost"
     done
 
     log_info "HTTP Basic Auth configured (user: ${user})"
@@ -304,8 +364,17 @@ pma_uninstall() {
     rm -rf "${DATA_DIR}/pma"
     rm -f "${NGINX_SITES_AVAILABLE}"/pma*.conf
     rm -f "${NGINX_SITES_ENABLED}"/pma*.conf
-    rm -f "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf
+    rm -f "${NGINX_ETC_DIR}"/includes/*.conf "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf
     rm -f "${NGINX_ETC_DIR}"/.htpasswd-pma
+    rm -f "${ETC_DIR}/pma-config"
+
+    for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
+        [[ -f "$vhost" ]] || continue
+        pma_remove_location "$vhost"
+    done
+    if [[ -f "${NGINX_ETC_DIR}/conf.d/default.conf" ]]; then
+        pma_remove_location "${NGINX_ETC_DIR}/conf.d/default.conf"
+    fi
 
     nginx_reload
 

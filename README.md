@@ -8,6 +8,8 @@
 
 **Nginx + MySQL/MariaDB + PHP** — A one-stop server environment manager for Debian/Ubuntu. All components are downloaded from official sources. Supports multi-version PHP co-existence, virtual host wizard, SSL certificate management, and more.
 
+<p align="center"><a href="#pig-nmp-中文说明">📖 中文版</a></p>
+
 ---
 
 ## Table of Contents
@@ -900,8 +902,6 @@ apt remove --purge nginx mysql-server mariadb-server vsftpd ufw -y
 ## License
 
 [Apache-2.0 license](https://github.com/laingyulee/pig-nmp#Apache-2.0-1-ov-file)
-
----
 
 <!-- ======================================================================== -->
 <!-- 中文版本 / Chinese Version                                                  -->

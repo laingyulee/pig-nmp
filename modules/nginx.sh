@@ -300,7 +300,7 @@ nginx_default_site_enable() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Default Site</title>
+<title>I Am Alive</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
@@ -318,22 +318,20 @@ p{color:#92929e;font-size:15px}
 <body>
 <div class="card">
 <div class="logo">
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-<ellipse cx="50" cy="58" rx="36" ry="30" fill="#d4a147"/>
-<ellipse cx="50" cy="62" rx="28" ry="12" fill="#e8b860"/>
-<ellipse cx="22" cy="48" rx="9" ry="15" fill="#d4a147" transform="rotate(-20 22 48)"/>
-<ellipse cx="78" cy="48" rx="9" ry="15" fill="#d4a147" transform="rotate(20 78 48)"/>
-<circle cx="35" cy="44" r="3.5" fill="#0f0f14"/>
-<circle cx="65" cy="44" r="3.5" fill="#0f0f14"/>
-<circle cx="37" cy="42.5" r="1.2" fill="#fff" opacity=".6"/>
-<circle cx="67" cy="42.5" r="1.2" fill="#fff" opacity=".6"/>
-<ellipse cx="44" cy="54" rx="3" ry="2" fill="#b8872a"/>
-<ellipse cx="56" cy="54" rx="3" ry="2" fill="#b8872a"/>
-<path d="M50 56 Q53 62 50 66" stroke="#b8872a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-<path d="M45 70 Q50 75 55 70" stroke="#b8872a" stroke-width="2" fill="none" stroke-linecap="round"/>
-<ellipse cx="42" cy="60" rx="2" ry="1" fill="#b8872a" opacity=".5"/>
-<ellipse cx="58" cy="60" rx="2" ry="1" fill="#b8872a" opacity=".5"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="48px" height="48px" viewBox="0 0 48 48"><g >
+<path fill="#D39B75" d="M42,31.1123c-0.55225,0-1-0.44727-1-1s0.44775-1,1-1c1.36865,0,3-0.52051,3-3
+	c0-1.6377-1.01758-1.97363-1.22168-2.02539c-0.52832-0.13086-0.86475-0.66406-0.74316-1.19531
+	c0.12109-0.53125,0.6333-0.87305,1.16895-0.75781C45.17139,22.33496,47,23.42578,47,26.1123C47,29.14941,45.0376,31.1123,42,31.1123
+	z"/>
+<path fill="#EEBC99" d="M30,17H18.64111c-2.35938-4.74902-6.84814-4.68164-8.97021-3.94434
+	c-0.5166,0.17969-0.79248,0.74121-0.61963,1.26074l1.65576,4.96777C8.61182,20.71094,6.97559,22.70312,6.01221,25H2
+	c-0.55225,0-1,0.44727-1,1v10c0,0.55273,0.44775,1,1,1h5.0874C8.52539,39.23633,10.5918,40.97852,13,41.98828V46
+	c0,0.55273,0.44775,1,1,1h6c0.55225,0,1-0.44727,1-1v-3h6v3c0,0.55273,0.44775,1,1,1h6c0.55225,0,1-0.44727,1-1v-4.01172
+	C39.81348,39.98047,43,35.25,43,30C43,22.83203,37.16846,17,30,17z"/>
+<path fill="#444444" d="M14,28c-1.10303,0-2-0.89746-2-2s0.89697-2,2-2s2,0.89746,2,2S15.10303,28,14,28z M14,26.00098h0.01025H14z
+	 M14,26.00098h0.01025H14z M14,26.00098h0.01025H14z M14,26.00098h0.01025H14z M14,26.00098h0.01025H14z M14,26h0.01025H14z M14,26
+	h0.00977H14z M14,26h0.00977H14z"/>
+</g></svg>
 </div>
 <h1>Hello World</h1>
 <p>Powered by Pig-NMP</p>

@@ -35,6 +35,4 @@ PHP_LOCATION_BLOCK
         access_log off;
         log_not_found off;
     }
-
-    include {{NGINX_ETC_DIR}}/includes/phpmyadmin.conf;
 }

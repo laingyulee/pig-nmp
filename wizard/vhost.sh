@@ -142,6 +142,16 @@ vhost_create() {
 
     ln -sf "$vhost_file" "${NGINX_SITES_ENABLED}/${domain}.conf"
 
+    if pma_has_config; then
+        local pma_path pma_fpm_sock
+        pma_path=$(pma_get_config path)
+        pma_fpm_sock=$(pma_get_config fpm_sock)
+        if [[ -n "$pma_path" && -n "$pma_fpm_sock" ]]; then
+            pma_inject_location "${NGINX_SITES_ENABLED}/${domain}.conf" "$pma_path" "$pma_fpm_sock"
+            log_info "phpMyAdmin location injected for ${domain}${pma_path}"
+        fi
+    fi
+
     cat > "${docroot}/index.php" << EOF
 <?php
 phpinfo();
