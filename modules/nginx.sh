@@ -166,6 +166,18 @@ nginx_setup_config() {
         fi
     fi
 
+    if [[ ! -f "${NGINX_ETC_DIR}/fastcgi_params" ]]; then
+        if [[ -f /etc/nginx/fastcgi_params ]]; then
+            cp -a /etc/nginx/fastcgi_params "${NGINX_ETC_DIR}/fastcgi_params"
+        fi
+    fi
+
+    if [[ ! -f "${NGINX_ETC_DIR}/fastcgi.conf" ]]; then
+        if [[ -f /etc/nginx/fastcgi.conf ]]; then
+            cp -a /etc/nginx/fastcgi.conf "${NGINX_ETC_DIR}/fastcgi.conf"
+        fi
+    fi
+
     nginx_setup_systemd
 }
 
