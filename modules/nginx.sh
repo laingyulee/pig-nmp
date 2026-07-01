@@ -52,6 +52,12 @@ nginx_install_apt() {
 
     if [[ $apt_ret -eq 0 ]] && is_installed nginx; then
         log_success "Nginx installed via APT: $(nginx -v 2>&1)"
+        # APT postinst auto-starts nginx with /etc/nginx/nginx.conf (listening on :80).
+        # Stop it immediately so port 80 is free for the pig-nmp managed unit which
+        # loads /etc/pig-nmp/nginx/nginx.conf. Otherwise systemctl start nginx later
+        # fails with "address already in use" and trips the ERR trap.
+        systemctl stop nginx 2>/dev/null || true
+        systemctl disable nginx 2>/dev/null || true
     else
         log_error "Failed to install Nginx via APT"
         return 1
@@ -197,7 +203,7 @@ nginx_setup_systemd() {
             NGINX_ETC_DIR="${NGINX_ETC_DIR}" \
             NGINX_PID="${RUN_DIR}/nginx.pid"
         systemctl daemon-reload
-        systemctl enable nginx &>/dev/null
+        systemctl enable nginx &>/dev/null || true
     fi
 }
 
@@ -240,11 +246,20 @@ nginx_install() {
 
     id www-data &>/dev/null || useradd -r -s /sbin/nologin www-data
 
-    systemctl start nginx &>/dev/null
+    # Ensure no stale nginx process (e.g. APT-auto-started one) holds port 80
+    systemctl stop nginx 2>/dev/null || true
+    # Use `if` guard so a failed start does not trip the global ERR trap
+    if ! systemctl start nginx 2>&1; then
+        log_error "Nginx failed to start"
+        local nginx_bin
+        nginx_bin=$(_nginx_get_bin)
+        [[ -n "$nginx_bin" ]] && "$nginx_bin" -t -c "${NGINX_ETC_DIR}/nginx.conf" 2>&1 | tail -10
+        return 1
+    fi
     if is_service_active nginx; then
         log_success "Nginx is running on port 80"
     else
-        log_error "Nginx failed to start"
+        log_error "Nginx is not active after start"
         return 1
     fi
 
