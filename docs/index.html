@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pig-NMP — Nginx + MySQL/MariaDB + PHP Environment Manager</title>
+<style>
+:root {
+  --bg-primary: #0c0c10;
+  --bg-secondary: #121216;
+  --bg-card: #18181e;
+  --bg-card-hover: #1e1e26;
+  --bg-elevated: #22222c;
+  --border: #2a2a36;
+  --border-light: #363646;
+  --text-primary: #eaeaef;
+  --text-secondary: #92929e;
+  --text-tertiary: #6a6a76;
+  --accent: #d4a147;
+  --accent-soft: rgba(212, 161, 71, 0.12);
+  --accent-glow: rgba(212, 161, 71, 0.06);
+  --green: #4caf7d;
+  --cyan: #5bc0de;
+  --red: #e06050;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", Consolas, monospace;
+  --max-width: 1040px;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden}
+::selection{background:var(--accent);color:var(--bg-primary)}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:#e8b860}
+img{max-width:100%}
+code{font-family:var(--font-mono);font-size:.875em}
+pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:auto}
+[data-lang="en"] .lang-zh{display:none!important}
+[data-lang="zh"] .lang-en{display:none!important}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:256px 256px}
+.ambient{position:fixed;top:-40vh;right:-20vw;width:70vw;height:80vh;background:radial-gradient(ellipse at center,var(--accent-glow) 0%,transparent 70%);pointer-events:none;z-index:0}
+.ambient-b{position:fixed;bottom:-30vh;left:-10vw;width:50vw;height:60vh;background:radial-gradient(ellipse at center,rgba(91,192,222,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
+.container{max-width:var(--max-width);margin:0 auto;padding:0 24px;position:relative;z-index:1}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-weight:600;font-size:1.125rem;letter-spacing:-.01em;color:var(--text-primary)}
+.logo-mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--bg-primary);font-weight:700;font-family:var(--font-mono)}
+.lang-toggle{display:flex;gap:2px;background:var(--bg-card);border-radius:8px;padding:2px;border:1px solid var(--border)}
+.lang-btn{background:none;border:none;color:var(--text-tertiary);padding:6px 14px;border-radius:6px;cursor:pointer;font-family:var(--font-sans);font-size:.8125rem;font-weight:500;transition:all .25s}
+.lang-btn.active{background:var(--accent);color:var(--bg-primary)}
+.hero{padding:100px 0 80px;text-align:center}
+.hero-label{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid rgba(212,161,71,.2);border-radius:100px;padding:4px 14px 4px 10px;font-size:.75rem;font-weight:500;color:var(--accent);letter-spacing:.03em;text-transform:uppercase;margin-bottom:28px}
+.hero-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-family:var(--font-serif);font-weight:600;font-size:clamp(2.5rem,6vw,4.25rem);line-height:1.08;letter-spacing:-.02em;margin-bottom:20px}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),#e8b860);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:1.125rem;color:var(--text-secondary);max-width:640px;margin:0 auto 36px;line-height:1.7}
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:.9375rem;font-weight:600;border:none;cursor:pointer;transition:all .25s;text-decoration:none}
+.btn-primary{background:var(--accent);color:var(--bg-primary)}
+.btn-primary:hover{background:#e8b860;transform:translateY(-1px);box-shadow:0 8px 30px rgba(212,161,71,.25)}
+.btn-secondary{background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--bg-card-hover);border-color:var(--border-light);transform:translateY(-1px)}
+.btn-icon{font-size:1.125em}
+.cmd-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:560px;margin:0 auto;position:relative}
+.cmd-block code{font-size:.8125rem;color:var(--text-primary);word-break:break-all;overflow-x:auto}
+.copy-btn{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:6px;border-radius:4px;transition:all .2s;flex-shrink:0;position:relative}
+.copy-btn:hover{color:var(--accent);background:var(--accent-soft)}
+.copy-btn.copied{color:var(--green)}
+.copy-tooltip{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);color:var(--text-primary);font-size:.6875rem;padding:4px 10px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
+.copy-btn.copied .copy-tooltip{opacity:1}
+.section{padding:80px 0}
+.section-header{text-align:center;margin-bottom:56px}
+.section-header h2{font-family:var(--font-serif);font-size:clamp(1.75rem,3.5vw,2.5rem);font-weight:600;letter-spacing:-.015em;margin-bottom:12px}
+.section-header p{color:var(--text-secondary);font-size:1rem;max-width:520px;margin:0 auto}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.feature-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:all .3s;position:relative;overflow:hidden}
+.feature-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0;transition:opacity .3s}
+.feature-card:hover{background:var(--bg-card-hover);border-color:var(--border-light);transform:translateY(-2px)}
+.feature-card:hover::before{opacity:1}
+.feature-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:1.125rem;margin-bottom:16px}
+.feature-card h3{font-size:1rem;font-weight:600;margin-bottom:8px}
+.feature-card p{font-size:.875rem;color:var(--text-secondary);line-height:1.65}
+.components{background:var(--bg-secondary);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.comp-row{display:grid;grid-template-columns:1fr 1fr 1fr;padding:16px 24px;border-bottom:1px solid var(--border);align-items:center;gap:12px}
+.comp-row:last-child{border-bottom:none}
+.comp-row.header{background:var(--bg-card);font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary)}
+.comp-row .name{font-weight:500;font-size:.9375rem}
+.comp-row .versions{font-family:var(--font-mono);font-size:.8125rem;color:var(--text-secondary)}
+.comp-row .badge{display:inline-block;padding:2px 10px;border-radius:100px;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.badge.apt{background:rgba(76,175,125,.12);color:var(--green)}
+.badge.src{background:rgba(91,192,222,.12);color:var(--cyan)}
+.badge.both{background:rgba(212,161,71,.12);color:var(--accent)}
+.install-steps{max-width:680px;margin:0 auto}
+.step{display:flex;gap:20px;margin-bottom:28px;align-items:flex-start}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--accent-soft);border:1px solid rgba(212,161,71,.2);display:flex;align-items:center;justify-content:center;font-size:.8125rem;font-weight:600;color:var(--accent);flex-shrink:0;margin-top:2px}
+.step-body{flex:1}
+.step-body h3{font-size:1rem;font-weight:600;margin-bottom:6px}
+.step-body p{font-size:.875rem;color:var(--text-secondary);margin-bottom:8px}
+.step-body .cmd-line{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;font-family:var(--font-mono);font-size:.8125rem;overflow-x:auto;display:block;color:var(--text-primary)}
+.step-body .cmd-line .prompt{color:var(--green)}
+.step-body .cmd-line .cmt{color:var(--text-tertiary);font-style:italic}
+.usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.usage-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.usage-card h3{font-size:.9375rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.usage-card h3 .cmd{color:var(--accent);font-family:var(--font-mono);font-size:.8125rem;background:var(--accent-soft);padding:1px 8px;border-radius:4px}
+.usage-card p{font-size:.8125rem;color:var(--text-secondary);margin-bottom:10px;line-height:1.65}
+.usage-card .cmd-line{font-family:var(--font-mono);font-size:.75rem;background:var(--bg-secondary);border-radius:6px;padding:10px 14px;overflow-x:auto;display:block;color:var(--text-primary);line-height:1.7}
+.footer{border-top:1px solid var(--border);padding:40px 0;margin-top:40px}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.footer p{font-size:.8125rem;color:var(--text-tertiary)}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:.8125rem;color:var(--text-tertiary)}
+.footer-links a:hover{color:var(--accent)}
+.fade-up{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+@media(max-width:640px){
+  .hero{padding:64px 0 48px}
+  .section{padding:48px 0}
+  .section-header{margin-bottom:36px}
+  .comp-row{grid-template-columns:1fr;padding:12px 16px;gap:4px}
+  .comp-row.header{display:none}
+  .cmd-block{flex-direction:column;align-items:stretch}
+  .step{gap:14px}
+  .feature-grid{grid-template-columns:1fr}
+  .usage-grid{grid-template-columns:1fr}
+  .footer-inner{flex-direction:column;text-align:center}
+}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="ambient"></div>
+<div class="ambient-b"></div>
+<div class="container">
+  <nav class="topbar">
+    <div class="logo">
+      <span class="logo-mark">P</span>
+      <span>Pig-NMP</span>
+    </div>
+    <div class="lang-toggle" role="tablist">
+      <button class="lang-btn active" data-lang="en" role="tab" aria-selected="true">EN</button>
+      <button class="lang-btn" data-lang="zh" role="tab" aria-selected="false">中文</button>
+    </div>
+  </nav>
+</div>
+<section class="hero">
+  <div class="container">
+    <div class="hero-label fade-up"><span class="hero-label-dot"></span> <span class="lang-en">v1.0.0 — Debian / Ubuntu</span><span class="lang-zh">v1.0.0 — Debian / Ubuntu</span></div>
+    <h1 class="fade-up" style="transition-delay:.1s">
+      <span class="lang-en">Ship your stack with<br><em>one command</em></span>
+      <span class="lang-zh"><em>一行命令</em><br>部署完整 Web 环境</span>
+    </h1>
+    <p class="fade-up" style="transition-delay:.2s">
+      <span class="lang-en">Nginx, MySQL/MariaDB, PHP — compiled from official sources. One script, zero bloat, production-ready.</span>
+      <span class="lang-zh">Nginx + MySQL/MariaDB + PHP 多版本管理。官方源编译，开箱即用，生产环境就绪。</span>
+    </p>
+    <div class="hero-actions fade-up" style="transition-delay:.3s">
+      <a class="btn btn-primary" href="#install">
+        <span class="btn-icon">↓</span>
+        <span class="lang-en">Get Started</span><span class="lang-zh">快速开始</span>
+      </a>
+      <a class="btn btn-secondary" href="#features">
+        <span class="lang-en">Features</span><span class="lang-zh">功能特性</span>
+      </a>
+    </div>
+    <div style="margin-top:28px;transition-delay:.35s" class="fade-up">
+      <div class="cmd-block">
+        <code>git clone https://github.com/laingyulee/pig-nmp.git &amp;&amp; cd pig-nmp &amp;&amp; sudo bash pig-nmp.sh</code>
+        <button class="copy-btn" data-cmd="git clone https://github.com/laingyulee/pig-nmp.git && cd pig-nmp && sudo bash pig-nmp.sh" aria-label="Copy command">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span class="copy-tooltip lang-en">Copied!</span>
+          <span class="copy-tooltip lang-zh">已复制!</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-header fade-up">
+      <h2><span class="lang-en">Why Pig-NMP?</span><span class="lang-zh">为什么选择 Pig-NMP？</span></h2>
+      <p><span class="lang-en">Everything you need for a modern PHP web stack, from one terminal.</span><span class="lang-zh">一个终端，搞定现代 PHP Web 环境所需的一切。</span></p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card fade-up" style="transition-delay:.05s">
+        <div class="feature-icon">⚡</div>
+        <h3><span class="lang-en">One-Command Setup</span><span class="lang-zh">一键安装</span></h3>
+        <p><span class="lang-en">Clone, run, done. The interactive menu walks you through every component.</span><span class="lang-zh">克隆、运行、完成。交互菜单引导你安装每个组件。</span></p>
+      </div>
+      <div class="feature-card fade-up" style="transition-delay:.1s">
+        <div class="feature-icon">📦</div>
+        <h3><span class="lang-en">Multi-Version PHP</span><span class="lang-zh">多版本 PHP</span></h3>
+        <p><span class="lang-en">8.1, 8.2, 8.3, 8.4 — side-by-side with independent php-fpm pools.</span><span class="lang-zh">8.1、8.2、8.3、8.4 并行运行，各自独立的 php-fpm 进程池。</span></p>
+      </div>
+      <div class="feature-card fade-up" style="transition-delay:.15s">
+        <div class="feature-icon">🔒</div>
+        <h3><span class="lang-en">Official Sources Only</span><span class="lang-zh">官方源编译</span></h3>
+        <p><span class="lang-en">No third-party PPAs. All software comes from nginx.org, php.net, mariadb.org, etc.</span><span class="lang-zh">无第三方 PPA。全部软件来自 nginx.org、php.net、mariadb.org 等官方源。</span></p>
+      </div>
+      <div class="feature-card fade-up" style="transition-delay:.2s">
+        <div class="feature-icon">🧩</div>
+        <h3><span class="lang-en">18+ PHP Extensions</span><span class="lang-zh">18+ PHP 扩展</span></h3>
+        <p><span class="lang-en">Redis, imagick, swoole, xdebug, grpc, mongodb, and more — install on demand.</span><span class="lang-zh">Redis、imagick、swoole、xdebug、grpc、mongodb 等，按需安装。</span></p>
+      </div>
+      <div class="feature-card fade-up" style="transition-delay:.25s">
+        <div class="feature-icon">🌐</div>
+        <h3><span class="lang-en">SSL &amp; Virtual Hosts</span><span class="lang-zh">SSL 证书与虚拟主机</span></h3>
+        <p><span class="lang-en">Let's Encrypt auto-provisioning, self-signed certs, and framework rewrite rules built-in.</span><span class="lang-zh">内置 Let's Encrypt 自动申请、自签证书，以及主流框架的 rewrite 规则。</span></p>
+      </div>
+      <div class="feature-card fade-up" style="transition-delay:.3s">
+        <div class="feature-icon">🛡</div>
+        <h3><span class="lang-en">Security Hardened</span><span class="lang-zh">安全加固</span></h3>
+        <p><span class="lang-en">Automatic MySQL/MariaDB secure init, UFW firewall presets, kernel parameter tuning.</span><span class="lang-zh">自动 MySQL/MariaDB 安全初始化、UFW 防火墙预设、内核参数调优。</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section">
+  <div class="container">
+    <div class="section-header fade-up">
+      <h2><span class="lang-en">What's Inside</span><span class="lang-zh">组件一览</span></h2>
+      <p><span class="lang-en">Every component installed from its official upstream repository.</span><span class="lang-zh">每个组件均从官方上游仓库安装。</span></p>
+    </div>
+    <div class="components fade-up">
+      <div class="comp-row header">
+        <span><span class="lang-en">Component</span><span class="lang-zh">组件</span></span>
+        <span><span class="lang-en">Versions</span><span class="lang-zh">版本</span></span>
+        <span><span class="lang-en">Method</span><span class="lang-zh">方式</span></span>
+      </div>
+      <div class="comp-row"><span class="name">Nginx</span><span class="versions">1.26 (stable) / 1.27 (mainline)</span><span><span class="badge both">APT / Source</span></span></div>
+      <div class="comp-row"><span class="name">PHP</span><span class="versions">8.1 · 8.2 · 8.3 · 8.4</span><span><span class="badge src">Source</span></span></div>
+      <div class="comp-row"><span class="name">MySQL</span><span class="versions">8.0 · 8.4 · 9.1</span><span><span class="badge apt">APT</span></span></div>
+      <div class="comp-row"><span class="name">MariaDB</span><span class="versions">10.11 · 11.4 · 11.6</span><span><span class="badge apt">APT</span></span></div>
+      <div class="comp-row"><span class="name">Redis</span><span class="versions">8.0 (stable) / 8.6 (latest)</span><span><span class="badge both">APT / Source</span></span></div>
+      <div class="comp-row"><span class="name">Memcached</span><span class="versions">1.6.38</span><span><span class="badge src">Source</span></span></div>
+      <div class="comp-row"><span class="name">phpMyAdmin</span><span class="versions">5.2.2</span><span><span class="badge src">Download</span></span></div>
+      <div class="comp-row"><span class="name">vsftpd (FTP)</span><span class="versions">3.0.5</span><span><span class="badge both">APT / Source</span></span></div>
+      <div class="comp-row"><span class="name">ionCube Loader</span><span class="versions">latest</span><span><span class="badge src">Download</span></span></div>
+      <div class="comp-row"><span class="name">UFW Firewall</span><span class="versions">system default</span><span><span class="badge apt">APT</span></span></div>
+    </div>
+  </div>
+</section>
+<section class="section" id="install">
+  <div class="container">
+    <div class="section-header fade-up">
+      <h2><span class="lang-en">Install in Seconds</span><span class="lang-zh">数秒内开始安装</span></h2>
+      <p><span class="lang-en">Debian 11/12 or Ubuntu 20.04–24.04 LTS · x86_64 · Root access required.</span><span class="lang-zh">支持 Debian 11/12、Ubuntu 20.04–24.04 LTS · x86_64 · 需要 root 权限。</span></p>
+    </div>
+    <div class="install-steps">
+      <div class="step fade-up" style="transition-delay:.05s">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3><span class="lang-en">Clone the repository</span><span class="lang-zh">克隆仓库</span></h3>
+          <code class="cmd-line"><span class="prompt">$</span> git clone https://github.com/laingyulee/pig-nmp.git</code>
+        </div>
+      </div>
+      <div class="step fade-up" style="transition-delay:.15s">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3><span class="lang-en">Launch the installer</span><span class="lang-zh">运行安装器</span></h3>
+          <code class="cmd-line"><span class="prompt">$</span> <span class="cmt"># Interactive menu</span><br><span class="prompt">$</span> sudo bash pig-nmp.sh<br><br><span class="prompt">$</span> <span class="cmt"># Or quick install everything</span><br><span class="prompt">$</span> sudo bash pig-nmp.sh install</code>
+        </div>
+      </div>
+      <div class="step fade-up" style="transition-delay:.25s">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3><span class="lang-en">Create a virtual host</span><span class="lang-zh">创建虚拟主机</span></h3>
+          <p><span class="lang-en">Follow the wizard to set up your domain, PHP version, SSL, and rewrite rules.</span><span class="lang-zh">跟随向导配置域名、PHP 版本、SSL 和 rewrite 规则。</span></p>
+          <code class="cmd-line"><span class="prompt">$</span> sudo bash pig-nmp.sh vhost</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section">
+  <div class="container">
+    <div class="section-header fade-up">
+      <h2><span class="lang-en">Command Reference</span><span class="lang-zh">命令参考</span></h2>
+      <p><span class="lang-en">Every component has its own management menu. Pass it as an argument.</span><span class="lang-zh">每个组件都有独立的管理菜单，作为参数传入即可。</span></p>
+    </div>
+    <div class="usage-grid">
+      <div class="usage-card fade-up" style="transition-delay:.05s"><h3><span class="cmd">pig-nmp.sh</span></h3><p><span class="lang-en">Interactive main menu with status overview.</span><span class="lang-zh">交互式主菜单，显示组件状态总览。</span></p><code class="cmd-line">sudo bash pig-nmp.sh</code></div>
+      <div class="usage-card fade-up" style="transition-delay:.1s"><h3><span class="cmd">pig-nmp.sh nginx</span></h3><p><span class="lang-en">Install, configure, and manage Nginx.</span><span class="lang-zh">安装、配置和管理 Nginx。</span></p><code class="cmd-line">sudo bash pig-nmp.sh nginx</code></div>
+      <div class="usage-card fade-up" style="transition-delay:.15s"><h3><span class="cmd">pig-nmp.sh php</span></h3><p><span class="lang-en">Multi-version PHP management &amp; extension installer.</span><span class="lang-zh">多版本 PHP 管理及扩展安装。</span></p><code class="cmd-line">sudo bash pig-nmp.sh php</code></div>
+      <div class="usage-card fade-up" style="transition-delay:.2s"><h3><span class="cmd">pig-nmp.sh mysql</span></h3><p><span class="lang-en">MySQL/MariaDB install, secure, databases.</span><span class="lang-zh">MySQL/MariaDB 安装、安全配置、数据库管理。</span></p><code class="cmd-line">sudo bash pig-nmp.sh mysql</code></div>
+      <div class="usage-card fade-up" style="transition-delay:.25s"><h3><span class="cmd">pig-nmp.sh ssl</span></h3><p><span class="lang-en">Let's Encrypt or self-signed SSL certificates.</span><span class="lang-zh">Let's Encrypt 或自签 SSL 证书。</span></p><code class="cmd-line">sudo bash pig-nmp.sh ssl</code></div>
+      <div class="usage-card fade-up" style="transition-delay:.3s"><h3><span class="cmd">pig-nmp.sh status</span></h3><p><span class="lang-en">Dashboard: OS, services, ports, resource usage.</span><span class="lang-zh">系统面板：操作系统、服务状态、端口、资源使用。</span></p><code class="cmd-line">sudo bash pig-nmp.sh status</code></div>
+    </div>
+  </div>
+</section>
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <p><span class="lang-en">Released under the Apache 2.0 License.</span><span class="lang-zh">基于 Apache 2.0 许可证发布。</span></p>
+      <div class="footer-links">
+        <a href="https://github.com/laingyulee/pig-nmp" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/laingyulee/pig-nmp/issues" target="_blank" rel="noopener"><span class="lang-en">Issues</span><span class="lang-zh">反馈</span></a>
+        <a href="#"><span class="lang-en">Back to top ↑</span><span class="lang-zh">回到顶部 ↑</span></a>
+      </div>
+    </div>
+  </div>
+</footer>
+<script>
+(function() {
+  const root = document.documentElement;
+  const btns = document.querySelectorAll('.lang-btn');
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      btns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      root.setAttribute('data-lang', lang);
+    });
+  });
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.cmd;
+      if (!text || !navigator.clipboard) return;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1800);
+      });
+    });
+  });
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+})();
+</script>
+</body>
+</html>
