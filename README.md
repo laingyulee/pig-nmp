@@ -113,7 +113,7 @@
 
 ```bash
 # 方式一：git clone
-git clone https://github.com/your-repo/Pig-NMP.git
+git clone https://github.com/laingyulee/pig-nmp.git
 cd Pig-NMP
 
 # 方式二：直接下载并上传到服务器
