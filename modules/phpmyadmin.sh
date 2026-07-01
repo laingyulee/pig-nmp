@@ -201,7 +201,9 @@ EOF
 
     for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
         [[ -f "$vhost" ]] || continue
-        if ! grep -q "includes/phpmyadmin.conf" "$vhost" 2>/dev/null; then
+        if grep -q "${NGINX_ETC_DIR}/conf.d/phpmyadmin.conf" "$vhost" 2>/dev/null; then
+            sed -i "s|${NGINX_ETC_DIR}/conf\.d/phpmyadmin\.conf|${NGINX_ETC_DIR}/includes/phpmyadmin.conf|g" "$vhost"
+        elif ! grep -q "includes/phpmyadmin.conf" "$vhost" 2>/dev/null; then
             sed -i '$i\    include '"${NGINX_ETC_DIR}/includes/phpmyadmin.conf;" "$vhost"
         fi
     done
