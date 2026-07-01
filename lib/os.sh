@@ -53,7 +53,10 @@ require_os() {
 }
 
 _pkg_is_installed() {
-    dpkg -s "$1" &>/dev/null
+    # Use dpkg-query to check the exact Status field. `dpkg -s` returns 0 even for
+    # packages in 'rc' state (removed but config files remain), which would cause
+    # install_deps to skip packages that are actually missing their binaries.
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q '^install ok installed$'
 }
 
 install_deps() {
@@ -144,7 +147,7 @@ install_build_deps() {
         libpcre2-dev
     )
     for pkg in "${optional_pkgs[@]}"; do
-        if ! dpkg -l "$pkg" &>/dev/null 2>&1 | grep -q '^ii'; then
+        if ! dpkg -l "$pkg" 2>/dev/null | grep -q '^ii'; then
             DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" 2>/dev/null || \
                 log_warn "Optional package ${pkg} not available, skipping"
         fi

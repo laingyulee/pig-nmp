@@ -198,14 +198,13 @@ pma_inject_location() {
     local pma_path="$2"
     local fpm_sock="$3"
 
+    # Remove any existing PMA block first (idempotent)
     sed -i '/^    # PIG-NMP phpMyAdmin start/,/^    # PIG-NMP phpMyAdmin end/d' "$vhost_file"
 
-    local tmp_file
-    tmp_file=$(mktemp)
-
-    head -n -1 "$vhost_file" > "$tmp_file"
-
-    cat >> "$tmp_file" << PMAEOF
+    # Build the location block in a temp file
+    local block_file
+    block_file=$(mktemp)
+    cat > "$block_file" << PMAEOF
     # PIG-NMP phpMyAdmin start
     location ${pma_path} {
         alias ${PHPMYADMIN_DIR};
@@ -231,8 +230,25 @@ pma_inject_location() {
     # PIG-NMP phpMyAdmin end
 PMAEOF
 
-    echo "}" >> "$tmp_file"
-    mv "$tmp_file" "$vhost_file"
+    # Find the last line matching ^} (the server block closing brace).
+    # This is robust against trailing blank lines or multiple server{} blocks.
+    local last_brace
+    last_brace=$(grep -n '^}[[:space:]]*$' "$vhost_file" | tail -1 | cut -d: -f1)
+    if [[ -z "$last_brace" ]]; then
+        log_warn "Cannot find server block closing brace in ${vhost_file}"
+        rm -f "$block_file"
+        return 1
+    fi
+
+    # Insert the block before the closing brace line
+    awk -v insert_line="$last_brace" -v block_file="$block_file" '
+        NR == insert_line {
+            while ((getline line < block_file) > 0) print line
+        }
+        { print }
+    ' "$vhost_file" > "${vhost_file}.pma_tmp" && mv "${vhost_file}.pma_tmp" "$vhost_file"
+
+    rm -f "$block_file"
 }
 
 pma_remove_location() {

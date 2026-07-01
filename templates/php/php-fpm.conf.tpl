@@ -10,6 +10,6 @@ log_level = warning
 emergency_restart_threshold = 10
 emergency_restart_interval = 1m
 process_control_timeout = 10s
-daemonize = yes
+daemonize = no
 
 include={{PHP_ETC_DIR}}/fpm/pool.d/*.conf

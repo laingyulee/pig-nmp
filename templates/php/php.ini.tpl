@@ -22,7 +22,7 @@ log_errors_max_len = 1024
 ignore_repeated_errors = On
 ignore_repeated_source = On
 report_memleaks = On
-error_log = {{LOG_DIR}}/php/php-errors.log
+error_log = {{LOG_DIR}}/php-fpm/php-errors.log
 
 variables_order = "GPCS"
 request_order = "GP"

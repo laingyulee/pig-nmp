@@ -207,8 +207,14 @@ cmd_purge() {
 
     log_info "Purging all Pig-NMP components..."
 
-    systemctl stop nginx php*-fpm mysql mariadb redis memcached vsftpd 2>/dev/null || true
-    systemctl disable nginx php*-fpm mysql mariadb redis memcached vsftpd 2>/dev/null || true
+    # Stop and disable all php-fpm services by listing matching units
+    local -a php_fpm_units=()
+    while IFS= read -r unit; do
+        [[ -n "$unit" ]] && php_fpm_units+=("$unit")
+    done < <(systemctl list-units --type=service --no-legend --no-pager 'php*-fpm.service' 2>/dev/null | awk '{print $1}')
+
+    systemctl stop nginx mysql mariadb redis memcached vsftpd "${php_fpm_units[@]}" 2>/dev/null || true
+    systemctl disable nginx mysql mariadb redis memcached vsftpd "${php_fpm_units[@]}" 2>/dev/null || true
 
     apt_remove nginx nginx-common nginx-full 2>/dev/null || true
     apt_remove mysql-server mysql-client mysql-common mariadb-server mariadb-client mariadb-common 2>/dev/null || true

@@ -218,7 +218,7 @@ ssl_apply_to_vhost() {
         local docroot
         docroot=$(grep -oP 'root\s+\K[^;]+' "$vhost_file" 2>/dev/null | head -1)
         local fpm_sock
-        fpm_sock=$(ss_get_fpm_pass "$vhost_file")
+        fpm_sock=$(ssl_get_fpm_pass "$vhost_file")
         local php_ver
         php_ver=$(grep -oP 'php(\d\.\d)' "$vhost_file" 2>/dev/null | head -1 | grep -oP '[\d.]+')
 

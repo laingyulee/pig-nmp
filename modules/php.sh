@@ -43,7 +43,22 @@ php_get_version() {
 
 php_get_ini_path() {
     local ver="$1"
-    echo "${PHP_ETC_DIR}/php${ver}/php.ini"
+    # APT-installed PHP loads ini from /etc/php/<ver>/{fpm,cli}/php.ini, not the
+    # pig-nmp symlink target. Source-installed PHP uses PHP_ETC_DIR/php<ver>/php.ini.
+    local method
+    method=$(php_install_method "$ver" 2>/dev/null)
+    if [[ "$method" == "apt" ]]; then
+        # Prefer fpm php.ini (used by php-fpm service); fall back to cli if missing
+        if [[ -f "/etc/php/${ver}/fpm/php.ini" ]]; then
+            echo "/etc/php/${ver}/fpm/php.ini"
+        elif [[ -f "/etc/php/${ver}/cli/php.ini" ]]; then
+            echo "/etc/php/${ver}/cli/php.ini"
+        else
+            echo "/etc/php/${ver}/fpm/php.ini"
+        fi
+    else
+        echo "${PHP_ETC_DIR}/php${ver}/php.ini"
+    fi
 }
 
 php_get_ext_dir() {

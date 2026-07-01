@@ -43,7 +43,10 @@ ftp_install() {
             apt_install vsftpd
             ;;
         "Source"*)
-            local version="${1:-$VSFTPD_VERSION}"
+            local version="${1:-}"
+            if [[ -z "$version" ]]; then
+                prompt_input "vsftpd version" "$VSFTPD_VERSION" version
+            fi
             ftp_install_source "$version"
             ;;
     esac
@@ -378,7 +381,7 @@ ftp_uninstall() {
     systemctl stop vsftpd &>/dev/null
     systemctl disable vsftpd &>/dev/null
 
-    if dpkg -l vsftpd &>/dev/null 2>&1 | grep -q '^ii'; then
+    if dpkg -l vsftpd 2>/dev/null | grep -q '^ii'; then
         apt_remove vsftpd
     else
         rm -f /usr/sbin/vsftpd

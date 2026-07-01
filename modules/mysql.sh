@@ -10,9 +10,9 @@ mysql_is_installed() {
 }
 
 mysql_get_type() {
-    if is_installed mariadb || dpkg -l mariadb-server &>/dev/null 2>&1 | grep -q '^ii'; then
+    if is_installed mariadb || dpkg -l mariadb-server 2>/dev/null | grep -q '^ii'; then
         echo "mariadb"
-    elif is_installed mysql || dpkg -l mysql-server &>/dev/null 2>&1 | grep -q '^ii'; then
+    elif is_installed mysql || dpkg -l mysql-server 2>/dev/null | grep -q '^ii'; then
         echo "mysql"
     else
         echo "none"
@@ -117,7 +117,8 @@ mysql_install_mysql() {
         return 1
     fi
 
-    systemctl start mysql 2>/dev/null || true
+    mysql_setup_config
+    systemctl restart mysql 2>/dev/null || systemctl start mysql 2>/dev/null || true
     mysql_secure "$root_password"
 }
 
@@ -178,7 +179,8 @@ mysql_install_mariadb() {
         return 1
     fi
 
-    systemctl start mariadb 2>/dev/null || true
+    mysql_setup_config
+    systemctl restart mariadb 2>/dev/null || systemctl start mariadb 2>/dev/null || true
     mysql_secure "$root_password"
 }
 
@@ -294,22 +296,33 @@ mysql_setup_config() {
     local db_type
     db_type=$(mysql_get_type)
 
-    ensure_dirs "${MYSQL_ETC_DIR}" "${MYSQL_DATA_DIR}" "${LOG_DIR}/mysql"
+    # APT-installed MySQL/MariaDB stores data in /var/lib/mysql, not /var/lib/pig-nmp/mysql.
+    # Write a managed snippet to /etc/mysql/conf.d/ so it is actually loaded by the
+    # default /etc/mysql/my.cnf include chain. Also keep a copy in MYSQL_ETC_DIR for
+    # the script's own reference / backup.
+    local real_data_dir="/var/lib/mysql"
+    ensure_dirs "${MYSQL_ETC_DIR}" "${real_data_dir}" "${LOG_DIR}/mysql" "/etc/mysql/conf.d"
 
     local my_cnf="${MYSQL_ETC_DIR}/my.cnf"
+    local drop_in="/etc/mysql/conf.d/pig-nmp.cnf"
     local mem_mb=$((SYSCTL_MEM / 1024))
     local innodb_buf=$((mem_mb * 70 / 100))
 
     if [[ ! -f "$my_cnf" ]]; then
         render_template "${TEMPLATES_DIR}/mysql/my.cnf.tpl" "$my_cnf" \
             DB_TYPE="${db_type}" \
-            MYSQL_DATA_DIR="${MYSQL_DATA_DIR}" \
+            MYSQL_DATA_DIR="${real_data_dir}" \
             MYSQL_ETC_DIR="${MYSQL_ETC_DIR}" \
             LOG_DIR="${LOG_DIR}" \
             INNODB_BUFFER_POOL="${innodb_buf}M" \
             MAX_CONNECTIONS="200" \
             SERVER_ID="1"
     fi
+
+    # Publish to the location MySQL actually loads from. Always overwrite so our
+    # managed settings take precedence over the vendor defaults.
+    cp -f "$my_cnf" "$drop_in"
+    chmod 644 "$drop_in"
 }
 
 mysql_uninstall() {

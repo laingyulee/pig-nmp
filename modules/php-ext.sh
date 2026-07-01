@@ -106,12 +106,14 @@ php_ext_install() {
             php_ext_enable "memcached" "$ver"
             ;;
         gd)
-            install_deps libgd-dev libpng-dev libjpeg-dev libwebp-dev libfreetype6-dev libxpm-dev
+            install_deps libgd-dev libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev
             php_ext_install_from_source_gd "$ver"
+            php_ext_enable "gd" "$ver"
             ;;
         intl)
             install_deps libicu-dev
             php_ext_install_from_source_intl "$ver"
+            php_ext_enable "intl" "$ver"
             ;;
         mongodb)
             install_deps libssl-dev
@@ -220,7 +222,7 @@ php_ext_install_pecl() {
     }
 
     local ext_dir
-    ext_dir=$(find . -maxdepth 1 -type d -name "${ext}*" | head -1)
+    ext_dir=$(find . -maxdepth 1 -type d -iname "${ext}*" | head -1)
     if [[ -z "$ext_dir" ]]; then
         log_error "Cannot find extracted extension directory"
         cd - || return 1
@@ -326,10 +328,26 @@ extension=${ext}.so
 EOF
     fi
 
-    local ini_file="${php_etc}/php.ini"
-    if [[ -f "$ini_file" ]]; then
-        if ! grep -q "extension=${ext}" "$ini_file" 2>/dev/null; then
-            echo "extension=${ext}.so" >> "$ini_file"
+    local method
+    method=$(php_install_method "$ver" 2>/dev/null)
+    if [[ "$method" == "apt" ]]; then
+        # APT PHP uses mods-available + conf.d symlinks per SAPI
+        local sapi
+        for sapi in fpm cli; do
+            local conf_d="/etc/php/${ver}/${sapi}/conf.d"
+            ensure_dirs "$conf_d"
+            local priority=20
+            [[ -e "${conf_d}/$(ls "${conf_d}" 2>/dev/null | grep -oP '\d+(?=-'"${ext}"')' | head -1)-${ext}.ini" ]] && continue
+            ln -sf "$conf_file" "${conf_d}/${priority}-${ext}.ini"
+        done
+    else
+        # Source PHP loads php.ini directly
+        local ini_file
+        ini_file=$(php_get_ini_path "$ver")
+        if [[ -f "$ini_file" ]]; then
+            if ! grep -q "extension=${ext}" "$ini_file" 2>/dev/null; then
+                echo "extension=${ext}.so" >> "$ini_file"
+            fi
         fi
     fi
 }
@@ -341,10 +359,29 @@ php_ext_enable_zend() {
     local ext_dir
     ext_dir=$(php_get_ext_dir "$ver")
 
-    local ini_file="${php_etc}/php.ini"
-    if [[ -f "$ini_file" ]]; then
-        if ! grep -q "zend_extension.*${ext}" "$ini_file" 2>/dev/null; then
-            sed_inplace "$ini_file" "1i zend_extension=${ext}.so"
+    local method
+    method=$(php_install_method "$ver" 2>/dev/null)
+    if [[ "$method" == "apt" ]]; then
+        # Use mods-available for zend extensions too
+        local mods_dir="${php_etc}/mods-available"
+        ensure_dirs "$mods_dir"
+        local conf_file="${mods_dir}/${ext}.ini"
+        cat > "$conf_file" << EOF
+zend_extension=${ext}.so
+EOF
+        local sapi
+        for sapi in fpm cli; do
+            local conf_d="/etc/php/${ver}/${sapi}/conf.d"
+            ensure_dirs "$conf_d"
+            ln -sf "$conf_file" "${conf_d}/00-${ext}.ini"
+        done
+    else
+        local ini_file
+        ini_file=$(php_get_ini_path "$ver")
+        if [[ -f "$ini_file" ]]; then
+            if ! grep -q "zend_extension.*${ext}" "$ini_file" 2>/dev/null; then
+                sed_inplace "$ini_file" "1i zend_extension=${ext}.so"
+            fi
         fi
     fi
 }

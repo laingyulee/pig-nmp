@@ -26,8 +26,9 @@ memcached_install() {
     fi
 
     require_os
-    install_build_deps
-    install_deps libevent-dev
+    # Memcached only needs a minimal set of build tools, not the full PHP/Nginx
+    # build dependency set pulled in by install_build_deps.
+    install_deps build-essential autoconf libevent-dev
 
     local version="${1:-$MEMCACHED_VERSION}"
     local url="https://memcached.org/files/memcached-${version}.tar.gz"

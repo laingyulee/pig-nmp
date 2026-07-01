@@ -62,7 +62,6 @@ log_bin = mysql-bin
 binlog_format = ROW
 binlog_cache_size = 4M
 max_binlog_size = 100M
-expire_logs_days = 7
 binlog_expire_logs_seconds = 604800
 
 sync_binlog = 1

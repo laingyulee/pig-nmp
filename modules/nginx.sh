@@ -47,9 +47,10 @@ nginx_install_apt() {
 
     systemctl stop nginx 2>/dev/null || true
     apt-get update -qq 2>/dev/null
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx 2>&1 | grep -iv 'kill:' || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx 2>&1 | grep -iv 'kill:'
+    local apt_ret=${PIPESTATUS[0]}
 
-    if [[ $? -eq 0 ]]; then
+    if [[ $apt_ret -eq 0 ]] && is_installed nginx; then
         log_success "Nginx installed via APT: $(nginx -v 2>&1)"
     else
         log_error "Failed to install Nginx via APT"

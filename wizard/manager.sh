@@ -134,7 +134,7 @@ manager_quick_install() {
         fi
     fi
 
-    if ! php_is_installed "$PHP_VERSION_DEFAULT"; then
+    if $step_ok && ! php_is_installed "$PHP_VERSION_DEFAULT"; then
         log_info "[2/3] Installing PHP ${PHP_VERSION_DEFAULT}..."
         case "$php_method" in
             *APT*|*SURY*)
@@ -147,6 +147,10 @@ manager_quick_install() {
                 php_install_source "$PHP_VERSION_DEFAULT" || { log_error "PHP ${PHP_VERSION_DEFAULT} install failed"; step_ok=false; }
                 ;;
         esac
+        if $step_ok; then
+            php_setup_config "$PHP_VERSION_DEFAULT"
+            systemctl start "php${PHP_VERSION_DEFAULT//./}-fpm" &>/dev/null || true
+        fi
     fi
 
     if $step_ok; then
