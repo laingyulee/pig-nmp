@@ -140,6 +140,7 @@ nginx_setup_config() {
         "${NGINX_ETC_DIR}" \
         "${NGINX_SITES_AVAILABLE}" \
         "${NGINX_SITES_ENABLED}" \
+        "${NGINX_ETC_DIR}/includes" \
         "${LOG_DIR}/nginx" \
         "${RUN_DIR}"
 

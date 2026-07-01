@@ -175,7 +175,8 @@ pma_setup_vhost_path() {
     escaped_path="${escaped_path//\{/\\{}"
     escaped_path="${escaped_path//\}/\\}}"
 
-    local pma_include="${NGINX_ETC_DIR}/conf.d/phpmyadmin.conf"
+    local pma_include="${NGINX_ETC_DIR}/includes/phpmyadmin.conf"
+    mkdir -p "${NGINX_ETC_DIR}/includes"
     cat > "$pma_include" << EOF
 location ${path} {
     alias ${PHPMYADMIN_DIR};
@@ -200,8 +201,8 @@ EOF
 
     for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
         [[ -f "$vhost" ]] || continue
-        if ! grep -q "conf.d/phpmyadmin.conf" "$vhost" 2>/dev/null; then
-            sed -i '$i\    include '"${NGINX_ETC_DIR}/conf.d/phpmyadmin.conf;" "$vhost"
+        if ! grep -q "includes/phpmyadmin.conf" "$vhost" 2>/dev/null; then
+            sed -i '$i\    include '"${NGINX_ETC_DIR}/includes/phpmyadmin.conf;" "$vhost"
         fi
     done
 
@@ -210,7 +211,7 @@ EOF
 
 pma_setup_ip_whitelist() {
     local allowed_ip="$1"
-    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf)
+    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf)
 
     for vhost in "${vhost_files[@]}"; do
         if [[ -f "$vhost" ]] && ! grep -q "allow.*${allowed_ip}" "$vhost" 2>/dev/null; then
@@ -229,7 +230,7 @@ pma_setup_basic_auth() {
     htpasswd -bc "$htpasswd_file" "$user" "$pass" 2>/dev/null
     chmod 640 "$htpasswd_file"
 
-    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf)
+    local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf)
     for vhost in "${vhost_files[@]}"; do
         if [[ -f "$vhost" ]] && ! grep -q "auth_basic" "$vhost" 2>/dev/null; then
             sed_inplace "$vhost" "/location.*php/a\\        auth_basic \"phpMyAdmin Login\";\n        auth_basic_user_file ${htpasswd_file};"
@@ -288,7 +289,7 @@ pma_uninstall() {
     rm -rf "${DATA_DIR}/pma"
     rm -f "${NGINX_SITES_AVAILABLE}"/pma*.conf
     rm -f "${NGINX_SITES_ENABLED}"/pma*.conf
-    rm -f "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf
+    rm -f "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf "${NGINX_ETC_DIR}"/conf.d/phpmyadmin.conf
     rm -f "${NGINX_ETC_DIR}"/.htpasswd-pma
 
     nginx_reload

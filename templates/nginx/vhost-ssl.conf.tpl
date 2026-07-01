@@ -63,5 +63,5 @@ PHP_LOCATION_BLOCK
         log_not_found off;
     }
 
-    include /etc/pig-nmp/nginx/conf.d/phpmyadmin.conf;
+    include {{NGINX_ETC_DIR}}/includes/phpmyadmin.conf;
 }
