@@ -112,7 +112,7 @@ ssl_issue_letsencrypt() {
     log_success "Let's Encrypt certificate issued for ${domain}"
 }
 
-ss_get_fpm_pass() {
+ssl_get_fpm_pass() {
     local vhost_file="$1"
     local fpm_pass
     fpm_pass=$(grep -oP 'fastcgi_pass\s+\K[^;]+' "$vhost_file" 2>/dev/null | head -1)
@@ -145,7 +145,7 @@ ssl_install_certificate() {
             local docroot
             docroot=$(grep -oP 'root\s+\K[^;]+' "$vhost_file" 2>/dev/null | head -1)
             local fpm_sock
-            fpm_sock=$(ss_get_fpm_pass "$vhost_file")
+            fpm_sock=$(ssl_get_fpm_pass "$vhost_file")
             local php_ver
             php_ver=$(grep -oP 'php(\d\.\d)' "$vhost_file" 2>/dev/null | head -1 | grep -oP '[\d.]+')
 

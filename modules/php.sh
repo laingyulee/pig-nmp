@@ -399,10 +399,11 @@ php_install_source() {
     fi
 
     cd - || return 1
-    rm -rf "$src_dir"
 
     log_info "Setting up PHP ${ver} configuration..."
-    php_setup_config "$ver"
+    php_setup_config "$ver" "$src_dir"
+
+    rm -rf "$src_dir"
 
     log_info "Installing PECL and common extensions..."
     php_setup_pecl "$ver"
@@ -423,6 +424,7 @@ php_install_source() {
 
 php_setup_config() {
     local ver="$1"
+    local src_dir="${2:-${TMP_DIR}/php-${ver}}"
     local php_prefix="${PHP_BASE_DIR}/php${ver}"
     local php_etc="${PHP_ETC_DIR}/php${ver}"
     local php_fpm_port
@@ -438,7 +440,7 @@ php_setup_config() {
         "${LOG_DIR}/php${ver}" \
         "${LOG_DIR}/php-fpm"
 
-    local ini_src="${src_dir:-${TMP_DIR}/php-${ver}}/php.ini-production"
+    local ini_src="${src_dir}/php.ini-production"
     local ini_dest="${php_etc}/php.ini"
     if [[ ! -f "$ini_dest" ]]; then
         if [[ -f "$ini_src" ]]; then

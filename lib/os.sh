@@ -277,7 +277,9 @@ ${LOG_DIR}/php*.log {
     create 640 www-data www-data
     sharedscripts
     postrotate
-        systemctl reload php*-fpm 2>/dev/null || true
+        for unit in /etc/systemd/system/php*-fpm.service /lib/systemd/system/php*-fpm.service; do
+            [ -f "\$unit" ] && systemctl reload "\$(basename "\$unit" .service)" 2>/dev/null || true
+        done
     endscript
 }
 

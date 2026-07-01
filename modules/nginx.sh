@@ -228,6 +228,7 @@ nginx_install() {
             ;;
     esac
 
+    rm -f /etc/systemd/system/nginx.service
     nginx_setup_config
 
     id www-data &>/dev/null || useradd -r -s /sbin/nologin www-data

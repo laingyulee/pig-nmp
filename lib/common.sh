@@ -179,27 +179,32 @@ wait_enter() {
 
 gen_password() {
     local len="${1:-16}"
-    local pass
-    pass=$(tr -dc 'A-Za-z0-9!@#%&*' < /dev/urandom 2>/dev/null | head -c "$len") || true
-    if [[ -z "$pass" ]]; then
-        pass=$(openssl rand -base64 48 2>/dev/null | tr -dc 'A-Za-z0-9!@#%&*' | head -c "$len") || true
+    local chars='A-Za-z0-9_@%-.,:+'
+    local pass=""
+    local i
+    for ((i=0; i<len; i++)); do
+        pass+=$(tr -dc "$chars" < /dev/urandom 2>/dev/null | head -c1)
+    done
+    if [[ ${#pass} -lt "$len" ]]; then
+        pass=$(openssl rand -base64 48 2>/dev/null | tr -dc "$chars" | head -c "$len")
     fi
-    if [[ -z "$pass" ]]; then
-        pass=$(date +%s%N 2>/dev/null | sha256sum 2>/dev/null | head -c "$len") || true
+    if [[ ${#pass} -lt "$len" ]]; then
+        pass=$(date +%s%N | sha256sum | head -c "$len")
     fi
-    echo "$pass"
+    [[ -z "$pass" ]] && pass="PigNMP_$(date +%s)"
+    echo "${pass:0:len}"
 }
 
 version_compare() {
     if [[ "$1" == "$2" ]]; then return 0; fi
     local IFS=.
     local -a v1=($1) v2=($2)
-    local i
+    local i p1 p2
     for ((i=0; i<${#v1[@]} || i<${#v2[@]}; i++)); do
-        local p1="${v1[i]:-0}"
-        local p2="${v2[i]:-0}"
-        p1="${p1##*(0)}"; p1="${p1:-0}"
-        p2="${p2##*(0)}"; p2="${p2:-0}"
+        p1="${v1[i]:-0}"
+        p2="${v2[i]:-0}"
+        p1=$((10#${p1}))
+        p2=$((10#${p2}))
         if ((p1 > p2)); then return 1; fi
         if ((p1 < p2)); then return 2; fi
     done

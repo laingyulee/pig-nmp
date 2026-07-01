@@ -182,19 +182,21 @@ location ${path} {
     alias ${PHPMYADMIN_DIR};
     index index.php index.html;
 
-    location ~ ^${escaped_path}/(.+\\.php)(.*)$ {
-        alias ${PHPMYADMIN_DIR}/\$1;
-        fastcgi_split_path_info ^(.+\\.php)(/.+)$;
+    location ~ ^${escaped_path}/(.+\.php)$ {
+        alias ${PHPMYADMIN_DIR};
+        try_files \$uri =404;
+        fastcgi_split_path_info ^${escaped_path}/(.+\.php)(/.+)$;
         fastcgi_pass unix:${fpm_sock};
-        fastcgi_param SCRIPT_FILENAME \$request_filename;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME ${PHPMYADMIN_DIR}/\$fastcgi_script_name;
         fastcgi_param PATH_INFO \$fastcgi_path_info;
         include fastcgi_params;
         fastcgi_buffers 16 16k;
         fastcgi_buffer_size 32k;
     }
 
-    location ~* ^${escaped_path}/(.+\\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
-        alias ${PHPMYADMIN_DIR}/\$1;
+    location ~* ^${escaped_path}/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+        alias ${PHPMYADMIN_DIR};
     }
 }
 EOF
@@ -213,7 +215,13 @@ pma_setup_ip_whitelist() {
     local vhost_files=("${NGINX_SITES_AVAILABLE}"/pma*.conf "${NGINX_ETC_DIR}"/includes/phpmyadmin.conf)
 
     for vhost in "${vhost_files[@]}"; do
-        if [[ -f "$vhost" ]] && ! grep -q "allow.*${allowed_ip}" "$vhost" 2>/dev/null; then
+        [[ -f "$vhost" ]] || continue
+        if grep -q "allow.*${allowed_ip}" "$vhost" 2>/dev/null; then
+            continue
+        fi
+        if [[ "$vhost" == *phpmyadmin.conf ]]; then
+            sed_inplace "$vhost" "/^location /a\\    allow ${allowed_ip};\n    deny all;"
+        else
             sed_inplace "$vhost" "/server_name/a\\    allow ${allowed_ip};\n    deny all;"
         fi
     done
