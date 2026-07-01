@@ -6,6 +6,917 @@
 
 # Pig-NMP
 
+**Nginx + MySQL/MariaDB + PHP** — A one-stop server environment manager for Debian/Ubuntu. All components are downloaded from official sources. Supports multi-version PHP co-existence, virtual host wizard, SSL certificate management, and more.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [System Requirements](#system-requirements)
+- [Quick Start](#quick-start)
+- [Directory Structure](#directory-structure)
+- [Usage Guide](#usage-guide)
+  - [Interactive Menu](#interactive-menu)
+  - [Command Line Mode](#command-line-mode)
+  - [Nginx Management](#nginx-management)
+  - [PHP Multi-Version Management](#php-multi-version-management)
+  - [MySQL/MariaDB Management](#mysqlmariadb-management)
+  - [Redis Management](#redis-management)
+  - [Memcached Management](#memcached-management)
+  - [PHP Extension Management](#php-extension-management)
+  - [ionCube Loader](#ioncube-loader)
+  - [phpMyAdmin Management](#phpmyadmin-management)
+  - [FTP Server Management](#ftp-server-management)
+  - [Firewall Management](#firewall-management)
+  - [Virtual Host Wizard](#virtual-host-wizard)
+  - [SSL Certificate Wizard](#ssl-certificate-wizard)
+  - [System Manager Panel](#system-manager-panel)
+- [Configuration File Paths](#configuration-file-paths)
+- [Port Assignment](#port-assignment)
+- [Mirror Acceleration](#mirror-acceleration)
+- [FAQ](#faq)
+- [Uninstall](#uninstall)
+
+---
+
+## Features
+
+| Component | Install Method | Versions | Management |
+|------|----------|----------|----------|
+| **Nginx** | Official APT / Source | stable / mainline | Start, stop, reload, config test |
+| **PHP** | Source compile | 8.1 / 8.2 / 8.3 / 8.4 | Multi-version, default version, FPM tuning |
+| **MySQL** | Official APT | 8.0 / 8.4 / 9.1 | Secure init, DB/user management |
+| **MariaDB** | Official APT | 10.11 / 11.4 / 11.6 | Secure init, DB/user management |
+| **Redis** | Source compile | 7.4+ | Password, persistence config |
+| **Memcached** | Source compile | 1.6+ | Memory/connection config |
+| **phpMyAdmin** | Official download | 5.2+ | Subdomain/path access, security hardening |
+| **FTP (vsftpd)** | APT / Source | 3.0+ | Virtual users, passive mode, SSL/TLS |
+| **ionCube** | Official download | Matches PHP | Per-version install |
+| **UFW Firewall** | APT | - | Three security presets, auto-config |
+
+**Wizard features:**
+
+- Virtual host creation wizard (WordPress / Laravel / ThinkPHP / Typecho / CodeIgniter / Drupal rewrite rules built-in)
+- SSL certificate wizard (Let's Encrypt auto-issue / self-signed)
+- System manager panel (status monitor, quick install, config backup)
+
+---
+
+## System Requirements
+
+### Supported OS
+
+| OS | Version | Codename | Status |
+|----------|------|------|------|
+| **Debian** | 12 | Bookworm | ✅ Fully tested |
+| **Debian** | 11 | Bullseye | ✅ Compatible |
+| **Ubuntu** | 24.04 LTS | Noble Numbat | ✅ Fully tested |
+| **Ubuntu** | 22.04 LTS | Jammy Jellyfish | ✅ Fully tested |
+| **Ubuntu** | 20.04 LTS | Focal Fossa | ⚠️ Basic compatibility (some new components may need manual tweaks) |
+| ~~Debian 10~~ | ~~10~~ | ~~Buster~~ | ❌ End of life |
+| ~~Ubuntu 18.04~~ | ~~18.04~~ | ~~Bionic~~ | ❌ End of life |
+
+> The script auto-detects the OS and codename via `/etc/os-release` and `/etc/debian_version` to configure correct APT sources. Only **x86_64 (amd64)** architecture is supported.
+
+### Hardware Requirements
+
+| Item | Minimum | Recommended |
+|------|----------|----------|
+| Architecture | x86_64 (amd64) | x86_64 |
+| Memory | 1 GB | 2 GB+ |
+| Disk | 10 GB | 20 GB+ |
+| Privilege | root | root |
+| Network | Internet access required | - |
+
+> **Note:** PHP source compilation requires at least 1.5 GB of available memory. The script will auto-create a 2 GB swap partition if memory is insufficient.
+
+### Software Dependencies
+
+The script automatically installs these system dependencies:
+
+| Dependency | Purpose |
+|------|------|
+| `build-essential` | C/C++ build toolchain |
+| `libssl-dev` | OpenSSL dev library (Nginx/PHP) |
+| `libpcre2-dev` / `libpcre3-dev` | Regex library (Nginx) |
+| `libmagickwand-dev` | ImageMagick dev library (PHP imagick) |
+| `libsqlite3-dev` | SQLite dev library (PHP) |
+| `curl` / `wget` | Download tools |
+| `gnupg` | APT repo signature verification |
+
+---
+
+## Quick Start
+
+### 1. Download
+
+```bash
+# Option A: git clone
+git clone https://github.com/laingyulee/pig-nmp.git
+cd pig-nmp
+
+# Option B: Download and upload to your server
+```
+
+### 2. Run the main script
+
+```bash
+chmod +x pig-nmp.sh
+sudo bash pig-nmp.sh
+```
+
+The first run displays the interactive main menu:
+
+```
+  ___ ___ ___     _       _                  _   _
+ | _ \_ _/ __|   /_\ _  _| |_ ___ _ __  __ _| |_(_)___ _ _
+ |  _/| | (_ |  / _ \ || |  _/ _ \ '  \/ _` |  _| / _ \ ' \
+ |_| |___\___| /_/ \_\_,_|\__\___/_|_|_\__,_|\__|_\___/_||_|
+
+  Nginx + MySQL/MariaDB + PHP Environment Manager
+  Version 1.0.0
+
+  Component Status:
+  ● Nginx 1.30.2
+  ● PHP 8.3
+  ● MARIADB
+  ● Redis 8.8.0
+  ○ Memcached (not installed)
+  ○ phpMyAdmin (not installed)
+  ○ FTP (not installed)
+
+========================================================================================
+
+  1)  Install/Update Components
+  2)  Manage Virtual Hosts
+  3)  Configure SSL Certificates
+  4)  PHP Version & Extension Management
+  5)  FTP Server Management
+  6)  Firewall (UFW) Management
+  7)  System Status & Manager
+  8)  Uninstall Components
+
+  0)  Exit
+
+Enter choice:
+```
+
+### 3. One-click NMP Install
+
+Select menu `1` → `9` (Quick Install), or run directly from the command line:
+
+```bash
+sudo bash pig-nmp.sh install
+```
+
+This will sequentially install Nginx + PHP + MySQL/MariaDB.
+
+---
+
+## Directory Structure
+
+```
+Pig-NMP/
+├── pig-nmp.sh                  # Main entry script
+├── config.inc.sh               # Global configuration
+├── lib/                        # Core utilities
+│   ├── common.sh               # Common functions (logging, input, template rendering)
+│   ├── color.sh                # Terminal color output
+│   ├── download.sh             # Download / extract / PECL install
+│   └── os.sh                   # OS detection, deps, system optimization
+├── modules/                    # Feature modules
+│   ├── nginx.sh                # Nginx install & management
+│   ├── php.sh                  # PHP multi-version install & management
+│   ├── mysql.sh                # MySQL/MariaDB install & management
+│   ├── redis.sh                # Redis install & management
+│   ├── memcached.sh            # Memcached install & management
+│   ├── php-ext.sh              # PHP extension management
+│   ├── phpmyadmin.sh           # phpMyAdmin install & management
+│   ├── ftp.sh                  # FTP (vsftpd) install & management
+│   ├── firewall.sh             # UFW firewall management
+│   └── ioncube.sh              # ionCube Loader management
+├── wizard/                     # Configuration wizards
+│   ├── vhost.sh                # Virtual host wizard
+│   ├── ssl.sh                  # SSL certificate wizard
+│   └── manager.sh              # System manager panel
+├── templates/                  # Config file templates
+│   ├── nginx/                  # Nginx config templates
+│   ├── php/                    # PHP/FPM config templates
+│   ├── mysql/                  # MySQL config templates
+│   ├── ftp/                    # vsftpd config templates
+│   └── systemd/                # systemd service templates
+└── conf/                       # Version & mirror config
+    ├── versions.conf           # Component versions
+    └── mirrors.conf            # China mirror configuration
+```
+
+---
+
+## Usage Guide
+
+### Interactive Menu
+
+Run `sudo bash pig-nmp.sh` to enter the interactive menu. Select functions by number.
+
+### Command Line Mode
+
+Supports direct command-line arguments for scripted automation:
+
+```bash
+sudo bash pig-nmp.sh nginx      # Nginx management menu
+sudo bash pig-nmp.sh php        # PHP management menu
+sudo bash pig-nmp.sh mysql      # MySQL/MariaDB management menu
+sudo bash pig-nmp.sh redis      # Redis management menu
+sudo bash pig-nmp.sh memcached  # Memcached management menu
+sudo bash pig-nmp.sh pma        # phpMyAdmin management menu
+sudo bash pig-nmp.sh ftp        # FTP management menu
+sudo bash pig-nmp.sh firewall   # Firewall management menu
+sudo bash pig-nmp.sh ioncube    # ionCube management menu
+sudo bash pig-nmp.sh vhost      # Virtual host management menu
+sudo bash pig-nmp.sh ssl        # SSL certificate management menu
+sudo bash pig-nmp.sh status     # Show system status
+sudo bash pig-nmp.sh install    # Quick install NMP
+sudo bash pig-nmp.sh help       # Show help
+```
+
+---
+
+### Nginx Management
+
+#### Installation
+
+Select menu `1` → `1`, two installation methods are available:
+
+**Method 1: Official APT repository (recommended)**
+
+- Automatically adds the nginx.org official APT repository
+- Choose between stable or mainline branch
+- Fast installation, updates via `apt upgrade`
+
+**Method 2: Source compilation**
+
+- Download and compile from nginx.org
+- Customizable compile modules (http_image_filter, http_geoip, http_dav, mail, etc.)
+- Default: SSL, HTTP/2, HTTP/3, RealIP, Gzip, Stub Status, Stream, etc.
+
+#### Management
+
+```
+Nginx Management
+  1) Install Nginx
+  2) Uninstall Nginx
+  3) Start/Stop/Restart
+  4) Reload Configuration
+  5) Test Configuration
+  6) Status
+  0) Back
+```
+
+---
+
+### PHP Multi-Version Management
+
+#### Installing PHP
+
+Select menu `1` → `2`, downloads and compiles from php.net.
+
+**Supported versions:** 8.1 / 8.2 / 8.3 / 8.4
+
+**Default compiled extensions:**
+pdo_mysql, mysqli, mbstring, openssl, curl, json, xml, zip, bcmath, opcache, pcntl, posix, tokenizer, ctype, fileinfo, session, filter, hash, gd, intl, soap, sockets, xsl, readline, ftp, bz2, gmp, exif, gettext, sodium, argon2, ldap
+
+> PHP compilation typically takes 10-20 minutes depending on server performance.
+
+**Multi-version co-existence:**
+
+Each PHP version is installed to its own directory:
+
+```
+/usr/local/php8.1/    # PHP 8.1
+/usr/local/php8.2/    # PHP 8.2
+/usr/local/php8.3/    # PHP 8.3
+/usr/local/php8.4/    # PHP 8.4
+```
+
+Each version runs an independent php-fpm process listening on different ports or Unix sockets:
+
+```
+PHP 8.1 → /var/run/pig-nmp/php-fpm/php8.1.sock  (port 9081)
+PHP 8.2 → /var/run/pig-nmp/php-fpm/php8.2.sock  (port 9082)
+PHP 8.3 → /var/run/pig-nmp/php-fpm/php8.3.sock  (port 9083)
+PHP 8.4 → /var/run/pig-nmp/php-fpm/php8.4.sock  (port 9084)
+```
+
+#### Setting the Default Version
+
+```bash
+# Interactive
+sudo bash pig-nmp.sh php → Select "Set default PHP version"
+```
+
+After setting, the `php`, `phpize`, `php-config`, `pear`, `pecl` commands will point to the default version.
+
+#### php-fpm Tuning
+
+Process management can be tuned per version:
+
+- **pm** = dynamic (recommended) / static / ondemand
+- **pm.max_children** = max child processes
+- **pm.start_servers** = processes on startup
+- **pm.min_spare_servers** = minimum idle processes
+- **pm.max_spare_servers** = maximum idle processes
+
+#### Assigning PHP Version to Virtual Hosts
+
+When creating a virtual host, you will be prompted to select a PHP version. The `fastcgi_pass` in the Nginx config will point to the corresponding version's socket.
+
+---
+
+### MySQL/MariaDB Management
+
+#### Installation
+
+Select menu `1` → `3`, then choose MySQL or MariaDB:
+
+**MySQL versions:** 8.0 / 8.4 / 9.1
+**MariaDB versions:** 10.11 / 11.4 / 11.6
+
+Installation process:
+1. Add official APT repository
+2. Install via APT
+3. Run secure initialization wizard
+
+#### Secure Initialization
+
+Automatically runs after installation:
+
+- Set root password (can be auto-generated)
+- Remove anonymous users
+- Disallow remote root login
+- Remove test database
+- Root password saved in `/etc/pig-nmp/mysql/.root_password` (permissions 600)
+
+#### Create Database and User
+
+```
+MySQL/MariaDB Management → 4) Create database and user
+```
+
+Interactive input:
+- Database name
+- Username (default: same as database name)
+- Password (leave blank to auto-generate)
+
+---
+
+### Redis Management
+
+Downloaded from redis.io and compiled from source.
+
+**Configuration:**
+- Listen address: 127.0.0.1:6379
+- Persistence: RDB + AOF (enabled by default)
+- Max memory: 20% of system memory
+- Eviction policy: allkeys-lru
+- Password: optional
+
+```bash
+# Set Redis password
+sudo bash pig-nmp.sh redis → 4) Set password
+```
+
+---
+
+### Memcached Management
+
+Downloaded from memcached.org and compiled from source.
+
+**Configuration:**
+- Listen address: 127.0.0.1:11211
+- Max memory: 10% of system memory
+- Max connections: 1024
+
+---
+
+### PHP Extension Management
+
+Select menu `4` → `2` (PHP Extension Management).
+
+**Supported extensions (18+):**
+
+| Extension | Description | System Deps |
+|-----------|------|----------|
+| imagick | Image processing with ImageMagick | libmagickwand-dev, imagemagick |
+| redis | Redis client | - |
+| memcached | Memcached client | libmemcached-dev |
+| gd | GD image processing | libgd-dev |
+| intl | Internationalization | libicu-dev |
+| mongodb | MongoDB client | libssl-dev |
+| swoole | Async coroutine framework | libssl-dev |
+| yaml | YAML parsing | libyaml-dev |
+| xdebug | Debugging / profiling | - |
+| grpc | gRPC framework | - |
+| protobuf | Protocol Buffers | - |
+| ssh2 | SSH2 | libssh2-1-dev |
+| rdkafka | Kafka client | librdkafka-dev |
+| amqp | AMQP protocol | librabbitmq-dev |
+| pcov | Code coverage | - |
+| excimer | Profiling | - |
+| mcrypt | Encryption (deprecated) | libmcrypt-dev |
+| opcache | OPcache (usually built-in) | - |
+
+**Installing extensions:**
+
+```bash
+# Interactive install
+sudo bash pig-nmp.sh php-ext
+# → Select PHP version → Enter extension name
+```
+
+**Batch install common extensions:**
+
+Select `5) Batch install common extensions` to auto-install imagick, redis, memcached, mongodb, swoole, yaml.
+
+---
+
+### ionCube Loader
+
+ionCube is a runtime loader for encrypted PHP code, commonly used to run encrypted commercial PHP software.
+
+**Installation process:**
+
+1. Download Linux x86_64 Loaders from ioncube.com
+2. Extract to `/usr/local/ioncube/`
+3. Auto-match installed PHP versions
+4. Copy the matching `ioncube_loader_lin_X.Y.so` to each PHP extension directory
+5. Prepend `zend_extension` line to `php.ini`
+6. Restart php-fpm and verify
+
+```bash
+# Interactive install
+sudo bash pig-nmp.sh ioncube → 1) Install ionCube
+
+# Verify
+/usr/local/php8.3/bin/php -v
+# Output should include: with the ionCube PHP Loader
+```
+
+> **Note:** ionCube must be loaded as a `zend_extension` and must appear before any other zend extensions. Cannot be used simultaneously with SourceGuardian or other encryption extensions.
+
+---
+
+### phpMyAdmin Management
+
+#### Installation
+
+Prerequisites: Nginx + at least one PHP version + MySQL/MariaDB must be installed.
+
+Installation process:
+1. Download phpMyAdmin to `/usr/local/phpmyadmin/`
+2. Generate config file (with random Blowfish Secret)
+3. Choose access method:
+   - **Subdomain access:** e.g. `pma.example.com` (creates a separate virtual host)
+   - **URL path access:** e.g. `example.com/pma` (adds a location block to existing vhost)
+4. Security configuration (optional):
+   - IP whitelist
+   - HTTP Basic Auth
+
+#### Security Hardening
+
+**Set IP whitelist:**
+```
+phpMyAdmin Management → 4) Configure security → Set IP whitelist
+# Enter allowed IP or CIDR (e.g. 192.168.1.0/24)
+```
+
+**Set HTTP Basic Auth:**
+```
+phpMyAdmin Management → 4) Configure security → Set HTTP Basic Auth
+# Enter username and password
+```
+
+**Update phpMyAdmin:**
+```
+phpMyAdmin Management → 2) Update phpMyAdmin
+# Enter new version number, auto-backup, update, and restore config
+```
+
+---
+
+### FTP Server Management
+
+#### Installing vsftpd
+
+Supports APT install or source compilation.
+
+Post-install interactive configuration:
+- Passive mode port range (default 40000-40100)
+- FTP over TLS/SSL (optional)
+
+#### User Management
+
+**Virtual users (recommended):**
+
+Virtual users authenticate via PAM without creating system users. Each user can have an independent home directory.
+
+```bash
+FTP Server Management → 3) Add FTP user
+# Select "Virtual user"
+# Enter username, password, home directory
+```
+
+**System users:**
+
+Create Linux system users with `/usr/sbin/nologin` as the login shell.
+
+#### Passive Mode Configuration
+
+FTP passive mode requires opening a port range and configuring the server's public IP:
+
+```bash
+FTP Server Management → 7) Configure passive mode
+# Enter port range (default 40000-40100)
+# Enter server public IP
+```
+
+> Ensure the firewall has opened the passive port range.
+
+#### SSL/TLS Configuration
+
+```bash
+FTP Server Management → 8) Configure SSL/TLS
+# Auto-generates a self-signed certificate
+# Or specify an existing certificate path
+```
+
+---
+
+### Firewall Management
+
+UFW (Uncomplicated Firewall) based firewall management.
+
+#### Security Presets
+
+| Port | Development | Production | Strict |
+|------|----------|----------|--------|
+| 22 (SSH) | Open | Open | IP-restricted |
+| 80 (HTTP) | Open | Open | Open |
+| 443 (HTTPS) | Open | Open | Open |
+| 21 (FTP) | Open | Closed | Closed |
+| 3306 (MySQL) | Open | Closed | Closed |
+| 6379 (Redis) | Open | Closed | Closed |
+| 11211 (Memcached) | Open | Closed | Closed |
+| 40000-40100 (FTP passive) | Open | Open | Closed |
+
+```bash
+# Apply security preset
+sudo bash pig-nmp.sh firewall → 3) Apply security profile
+```
+
+#### Auto-Configuration
+
+```bash
+sudo bash pig-nmp.sh firewall → 6) Auto-configure
+```
+
+Auto-detects installed services and configures rules:
+- Nginx → Open 80/443
+- FTP → Open 21 + passive ports
+- MySQL → Block 3306 (SSH tunnel recommended)
+- Redis → Block 6379 (local only)
+- Memcached → Block 11211 (local only)
+
+---
+
+### Virtual Host Wizard
+
+#### Creating a Virtual Host
+
+```
+Virtual Host Management → 1) Create virtual host
+```
+
+The wizard will ask:
+
+1. **Domain:** e.g. `example.com`
+2. **Document root:** default `/home/www/domains/example.com`
+3. **PHP version:** select an installed PHP version (determines fastcgi_pass target)
+4. **Enable SSL:** yes/no
+5. **Rewrite rules:** choose from supported frameworks
+
+**Supported rewrite rules:**
+
+| Framework | Rule |
+|------|------|
+| WordPress | `try_files $uri $uri/ /index.php?$args;` |
+| Laravel | `try_files $uri $uri/ /index.php?$query_string;` |
+| ThinkPHP | `rewrite ^(.*)$ /index.php?s=$1 last;` |
+| Typecho | `rewrite ^(.*)$ /index.php$1 last;` |
+| CodeIgniter | `try_files $uri $uri/ /index.php/$uri?$query_string;` |
+| Drupal | `try_files $uri /index.php?$query_string;` |
+
+After creation, Nginx config files are generated at:
+
+```
+/etc/pig-nmp/nginx/sites-available/example.com.conf
+/etc/pig-nmp/nginx/sites-enabled/example.com.conf  (symlink)
+```
+
+#### Enable / Disable Virtual Host
+
+```
+Enable: Virtual Host Management → 4) Enable virtual host
+Disable: Virtual Host Management → 5) Disable virtual host
+```
+
+Implemented by creating/removing symlinks in `sites-enabled` without modifying config files.
+
+#### Deleting a Virtual Host
+
+```
+Virtual Host Management → 2) Delete virtual host
+```
+
+Optionally delete the document root as well.
+
+---
+
+### SSL Certificate Wizard
+
+#### Let's Encrypt Certificate
+
+```
+SSL Certificate Management → 1) Issue Let's Encrypt certificate
+```
+
+Three verification methods are supported:
+
+1. **HTTP (webroot)** — Most common, auto-places verification file in the site root
+2. **DNS (manual)** — Manually add DNS TXT record
+3. **DNS (Cloudflare API)** — Auto-add DNS records via Cloudflare API
+
+Installs acme.sh and auto-configures certificate renewal cron job.
+
+#### Self-Signed Certificate
+
+```
+SSL Certificate Management → 2) Generate self-signed certificate
+```
+
+For testing environments. Browsers will show a security warning.
+
+#### Certificate Renewal
+
+```
+SSL Certificate Management → 3) Renew certificate
+# Renew for a specific domain or all certificates
+```
+
+acme.sh auto-renews by default; this is for manual triggering.
+
+#### View Certificate Info
+
+```
+SSL Certificate Management → 6) Show certificate info
+# Shows validity, issuer, etc.
+```
+
+---
+
+### System Manager Panel
+
+```
+System Manager
+  1) System status         — OS, memory, disk, load info
+  2) Services status       — All component running status
+  3) Port status           — Port usage
+  4) Quick install NMP     — One-click Nginx + PHP + MySQL
+  5) Backup configuration  — Backup all config files
+  6) System optimization   — Kernel parameters, file descriptor tuning
+```
+
+---
+
+## Configuration File Paths
+
+All configuration files are stored under `/etc/pig-nmp/`:
+
+| Component | Config Path |
+|------|------------|
+| Nginx main config | `/etc/pig-nmp/nginx/nginx.conf` |
+| Sites available | `/etc/pig-nmp/nginx/sites-available/` |
+| Sites enabled | `/etc/pig-nmp/nginx/sites-enabled/` |
+| Nginx extra config | `/etc/pig-nmp/nginx/conf.d/` |
+| PHP config | `/etc/pig-nmp/php/{version}/php.ini` |
+| php-fpm config | `/etc/pig-nmp/php/{version}/php-fpm.conf` |
+| php-fpm Pool | `/etc/pig-nmp/php/{version}/fpm/pool.d/www.conf` |
+| MySQL/MariaDB config | `/etc/pig-nmp/mysql/my.cnf` |
+| MySQL root password | `/etc/pig-nmp/mysql/.root_password` |
+| Redis config | `/etc/pig-nmp/redis/redis.conf` |
+| vsftpd config | `/etc/pig-nmp/vsftpd/vsftpd.conf` |
+| FTP virtual users | `/etc/pig-nmp/vsftpd/users/` |
+| SSL certificates | `/etc/pig-nmp/ssl/{domain}/` |
+
+**Installation paths:**
+
+| Component | Path |
+|------|----------|
+| Nginx (source) | `/usr/local/nginx/` |
+| PHP versions | `/usr/local/php{version}/` |
+| Redis | `/usr/local/redis/` |
+| Memcached | `/usr/local/memcached/` |
+| ionCube Loaders | `/usr/local/ioncube/` |
+| phpMyAdmin | `/usr/local/phpmyadmin/` |
+| acme.sh | `~/.acme.sh/` |
+
+**Log paths:**
+
+| Log | Path |
+|------|------|
+| Nginx access log | `/var/log/pig-nmp/nginx/access.log` |
+| Nginx error log | `/var/log/pig-nmp/nginx/error.log` |
+| Site access log | `/var/log/pig-nmp/nginx/{domain}.access.log` |
+| PHP error log | `/var/log/pig-nmp/php/php-errors.log` |
+| php-fpm error log | `/var/log/pig-nmp/php-fpm/` |
+| MySQL slow query log | `/var/log/pig-nmp/mysql/slow.log` |
+| Redis log | `/var/log/pig-nmp/redis/redis.log` |
+| vsftpd log | `/var/log/pig-nmp/vsftpd/vsftpd.log` |
+| Pig-NMP error log | `/var/log/pig-nmp/error.log` |
+
+---
+
+## Port Assignment
+
+| Port | Service | Description |
+|------|------|------|
+| 22 | SSH | Remote management |
+| 80 | Nginx (HTTP) | Website access |
+| 443 | Nginx (HTTPS) | Secure website access |
+| 21 | vsftpd (FTP) | File transfer |
+| 3306 | MySQL/MariaDB | Database (local only recommended) |
+| 6379 | Redis | Cache (local only recommended) |
+| 11211 | Memcached | Cache (local only recommended) |
+| 9081 | PHP-FPM 8.1 | Fallback port (Unix socket by default) |
+| 9082 | PHP-FPM 8.2 | Fallback port |
+| 9083 | PHP-FPM 8.3 | Fallback port |
+| 9084 | PHP-FPM 8.4 | Fallback port |
+| 40000-40100 | FTP passive mode | Customizable range |
+
+---
+
+## Mirror Acceleration
+
+If your server is located in Mainland China, enable mirror acceleration for downloads.
+
+Edit `config.inc.sh`:
+
+```bash
+# Set MIRROR_CN to "true"
+MIRROR_CN="true"
+```
+
+Supported mirrors:
+- PHP → sohu mirror
+- Nginx → huawei mirror
+- Redis → huawei mirror
+- phpMyAdmin → huawei mirror
+
+Falls back to official sources if mirror download fails.
+
+---
+
+## FAQ
+
+### Q: PHP compilation failed?
+
+Check the compilation logs:
+
+```bash
+cat /var/log/pig-nmp/php-{version}-configure.log
+cat /var/log/pig-nmp/php-{version}-make.log
+```
+
+Common causes:
+- Missing system dependencies → run system optimization or manually install `build-essential`, etc.
+- Insufficient memory → add swap (the script auto-adds swap for systems with less than 2 GB RAM)
+
+### Q: How to run multiple PHP versions on the same server?
+
+Each virtual host's Nginx `fastcgi_pass` points to the corresponding PHP version's socket:
+
+```nginx
+# Site A uses PHP 8.2
+fastcgi_pass unix:/var/run/pig-nmp/php-fpm/php8.2.sock;
+
+# Site B uses PHP 8.3
+fastcgi_pass unix:/var/run/pig-nmp/php-fpm/php8.3.sock;
+```
+
+Select the PHP version during the virtual host wizard to auto-configure.
+
+### Q: How to connect to MySQL remotely?
+
+**Opening port 3306 directly is not recommended.** Use an SSH tunnel instead:
+
+```bash
+ssh -L 3306:127.0.0.1:3306 user@your-server
+# Then connect to 127.0.0.1:3306 locally
+```
+
+If remote access is truly required, open port 3306 in the firewall and grant remote user permissions in MySQL.
+
+### Q: Website errors after installing ionCube?
+
+Ensure the `zend_extension` line for ionCube appears before all other zend extensions in `php.ini`. Check:
+
+```bash
+/usr/local/php8.3/bin/php -v
+# If errors, check zend_extension order in php.ini
+```
+
+### Q: Let's Encrypt certificate issuance failed?
+
+- Ensure the domain resolves to your server IP
+- Ensure port 80 is accessible from the internet
+- Check Nginx config: `nginx -t`
+- If using DNS verification, ensure the TXT record has propagated
+
+### Q: FTP connection timeout?
+
+- Check that the firewall has opened ports 21 and the passive port range
+- Check `pasv_address` in passive mode config — must be the server's public IP
+- If using Alibaba Cloud / Tencent Cloud, open the ports in the security group as well
+
+### Q: How to modify PHP config (upload_max_filesize, etc.)?
+
+Edit the `php.ini` for the corresponding version:
+
+```bash
+vi /etc/pig-nmp/php/8.3/php.ini
+# Modify upload_max_filesize, memory_limit, etc.
+
+# Then restart php-fpm
+systemctl restart php8.3-fpm
+```
+
+---
+
+## Uninstall
+
+Uninstall components one by one via the interactive menu `8) Uninstall Components`, or remove everything manually:
+
+```bash
+# Stop all services
+systemctl stop nginx php*-fpm mysql redis memcached vsftpd 2>/dev/null
+
+# Remove installation files
+rm -rf /usr/local/nginx /usr/local/php* /usr/local/redis /usr/local/memcached
+rm -rf /usr/local/phpmyadmin /usr/local/ioncube
+
+# Remove config files
+rm -rf /etc/pig-nmp
+
+# Remove logs
+rm -rf /var/log/pig-nmp
+
+# Remove data (caution!)
+rm -rf /var/lib/pig-nmp
+
+# Remove systemd services
+rm -f /etc/systemd/system/nginx.service
+rm -f /etc/systemd/system/php*-fpm.service
+rm -f /etc/systemd/system/redis.service
+rm -f /etc/systemd/system/memcached.service
+rm -f /etc/systemd/system/vsftpd.service
+systemctl daemon-reload
+
+# If installed via APT
+apt remove --purge nginx mysql-server mariadb-server vsftpd ufw -y
+```
+
+---
+
+## License
+
+[Apache-2.0 license](https://github.com/laingyulee/pig-nmp#Apache-2.0-1-ov-file)
+
+---
+
+<!-- ======================================================================== -->
+<!-- 中文版本 / Chinese Version                                                  -->
+<!-- ======================================================================== -->
+
+<div align="center">
+
+---
+
+# 🐷 Pig-NMP 中文说明
+
+---
+
+</div>
+
 **Nginx + MySQL/MariaDB + PHP** 一站式服务器环境管理工具，专为 Debian/Ubuntu 设计。全部组件从官方源下载，支持多版本 PHP 共存、虚拟主机向导、SSL 证书管理等功能。
 
 ---
@@ -77,7 +988,7 @@
 | ~~Debian 10~~ | ~~10~~ | ~~Buster~~ | ❌ 已停止支持 |
 | ~~Ubuntu 18.04~~ | ~~18.04~~ | ~~Bionic~~ | ❌ 已停止支持 |
 
-> **说明：** 脚本通过检测 `/etc/os-release` 和 `/etc/debian_version` 自动识别操作系统及版本代号（codename），用于配置正确的 APT 源。仅支持 **x86_64 (amd64)** 架构。
+> 脚本通过检测 `/etc/os-release` 和 `/etc/debian_version` 自动识别操作系统及版本代号，用于配置正确的 APT 源。仅支持 **x86_64 (amd64)** 架构。
 
 ### 硬件要求
 
@@ -89,7 +1000,7 @@
 | 权限 | root | root |
 | 网络 | 需要访问外网下载组件 | - |
 
-> **编译安装提示：** PHP 源码编译至少需要 1.5 GB 可用内存，内存不足时脚本会自动创建 2GB swap 分区。
+> **编译提示：** PHP 源码编译至少需要 1.5 GB 可用内存，内存不足时脚本会自动创建 2GB swap 分区。
 
 ### 软件依赖
 
@@ -114,10 +1025,9 @@
 ```bash
 # 方式一：git clone
 git clone https://github.com/laingyulee/pig-nmp.git
-cd Pig-NMP
+cd pig-nmp
 
 # 方式二：直接下载并上传到服务器
-# 将整个 Pig-NMP 目录上传到服务器任意位置
 ```
 
 ### 2. 运行主脚本
@@ -134,7 +1044,6 @@ sudo bash pig-nmp.sh
  | _ \_ _/ __|   /_\ _  _| |_ ___ _ __  __ _| |_(_)___ _ _
  |  _/| | (_ |  / _ \ || |  _/ _ \ '  \/ _` |  _| / _ \ ' \
  |_| |___\___| /_/ \_\_,_|\__\___/_|_|_\__,_|\__|_\___/_||_|
-                                                                                                                        
 
   Nginx + MySQL/MariaDB + PHP Environment Manager
   Version 1.0.0
@@ -148,7 +1057,7 @@ sudo bash pig-nmp.sh
   ○ phpMyAdmin (not installed)
   ○ FTP (not installed)
 
-========================================================================================================================
+========================================================================================
 
   1)  Install/Update Components
   2)  Manage Virtual Hosts
@@ -315,8 +1224,6 @@ PHP 8.4 → /var/run/pig-nmp/php-fpm/php8.4.sock  (端口 9084)
 ```bash
 # 交互式
 sudo bash pig-nmp.sh php → 选择 "Set default PHP version"
-
-# 或直接通过菜单操作
 ```
 
 设置后，`php`、`phpize`、`php-config`、`pear`、`pecl` 命令将指向默认版本。
@@ -436,11 +1343,6 @@ sudo bash pig-nmp.sh redis → 4) Set password
 # 交互式安装
 sudo bash pig-nmp.sh php-ext
 # → 选择 PHP 版本 → 输入扩展名
-
-# 示例：安装 imagick 扩展
-# 1. 选择 PHP 版本（如 8.3）
-# 2. 输入扩展名：imagick
-# 脚本会自动安装系统依赖、编译扩展、启用扩展、重启 php-fpm
 ```
 
 **批量安装常用扩展：**
@@ -466,7 +1368,6 @@ ionCube 是 PHP 加密代码的运行时加载器，常用于运行加密的商�
 # 交互式安装
 sudo bash pig-nmp.sh ioncube → 1) Install ionCube
 
-# 选择要安装的 PHP 版本
 # 验证安装成功
 /usr/local/php8.3/bin/php -v
 # 输出应包含: with the ionCube PHP Loader
@@ -534,7 +1435,6 @@ phpMyAdmin Management → 2) Update phpMyAdmin
 FTP Server Management → 3) Add FTP user
 # 选择 "Virtual user"
 # 输入用户名、密码、家目录
-# 家目录自动关联到虚拟主机根目录
 ```
 
 **系统用户：**
@@ -908,6 +1808,6 @@ apt remove --purge nginx mysql-server mariadb-server vsftpd ufw -y
 
 ---
 
-## License
+## License / 许可证
 
 [Apache-2.0 license](https://github.com/laingyulee/pig-nmp#Apache-2.0-1-ov-file)
