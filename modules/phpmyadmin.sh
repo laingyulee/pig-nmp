@@ -198,6 +198,13 @@ location ${path} {
 }
 EOF
 
+    for vhost in "${NGINX_SITES_ENABLED}"/*.conf; do
+        [[ -f "$vhost" ]] || continue
+        if ! grep -q "conf.d/phpmyadmin.conf" "$vhost" 2>/dev/null; then
+            sed -i '$i\    include '"${NGINX_ETC_DIR}/conf.d/phpmyadmin.conf;" "$vhost"
+        fi
+    done
+
     log_info "phpMyAdmin path configuration added: ${path}"
 }
 
