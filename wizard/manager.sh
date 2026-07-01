@@ -94,8 +94,10 @@ manager_quick_install() {
         return 0
     fi
 
-    local db_type
-    db_type=$(prompt_select "Select database:" "MariaDB 10.11" "MySQL 8.0")
+    local db_sel
+    db_sel=$(prompt_select "Select database:" "MariaDB 10.11" "MySQL 8.0")
+    local db_type="${db_sel% *}"
+    local db_version="${db_sel#* }"
 
     local php_method
     php_method=$(prompt_select "Select PHP installation method:" "APT - SURY repository (fast)" "Source compilation")
@@ -119,16 +121,16 @@ manager_quick_install() {
     fi
 
     case "$db_type" in
-        MySQL*)
+        MySQL)
             if ! mysql_is_installed; then
-                log_info "[3/3] Installing MySQL..."
-                mysql_install_mysql
+                log_info "[3/3] Installing MySQL ${db_version}..."
+                mysql_install_mysql "$db_version"
             fi
             ;;
-        MariaDB*)
+        MariaDB)
             if ! mysql_is_installed; then
-                log_info "[3/3] Installing MariaDB..."
-                mysql_install_mariadb
+                log_info "[3/3] Installing MariaDB ${db_version}..."
+                mysql_install_mariadb "$db_version"
             fi
             ;;
     esac

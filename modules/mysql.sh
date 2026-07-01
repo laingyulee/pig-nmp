@@ -51,15 +51,27 @@ mysql_install() {
 mysql_install_mysql() {
     require_os
 
-    local -a versions=($MYSQL_VERSIONS)
-    echo -e "\n${HEADER_COLOR}Select MySQL version:${C_RESET}"
-    local -a opts=()
-    for v in "${versions[@]}"; do
-        opts+=("MySQL ${v}")
-    done
-    local sel
-    sel=$(prompt_select "Choose version:" "${opts[@]}")
-    local version="${sel#MySQL }"
+    local version="${1:-}"
+    local root_password="${2:-}"
+    if [[ -z "$version" ]]; then
+        local -a versions=($MYSQL_VERSIONS)
+        echo -e "\n${HEADER_COLOR}Select MySQL version:${C_RESET}"
+        local -a opts=()
+        for v in "${versions[@]}"; do
+            opts+=("MySQL ${v}")
+        done
+        local sel
+        sel=$(prompt_select "Choose version:" "${opts[@]}")
+        version="${sel#MySQL }"
+    fi
+    if [[ -z "$root_password" ]]; then
+        echo -e "\n${HEADER_COLOR}Set MySQL root password${C_RESET}"
+        prompt_password "Root password (leave empty for auto-generated)" root_password
+        if [[ -z "$root_password" ]]; then
+            root_password=$(gen_password 20)
+            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
+        fi
+    fi
 
     log_info "Installing MySQL ${version}..."
 
@@ -105,21 +117,34 @@ mysql_install_mysql() {
         return 1
     fi
 
-    mysql_secure
+    systemctl start mysql 2>/dev/null || true
+    mysql_secure "$root_password"
 }
 
 mysql_install_mariadb() {
     require_os
 
-    local -a versions=($MARIADB_VERSIONS)
-    echo -e "\n${HEADER_COLOR}Select MariaDB version:${C_RESET}"
-    local -a opts=()
-    for v in "${versions[@]}"; do
-        opts+=("MariaDB ${v}")
-    done
-    local sel
-    sel=$(prompt_select "Choose version:" "${opts[@]}")
-    local version="${sel#MariaDB }"
+    local version="${1:-}"
+    local root_password="${2:-}"
+    if [[ -z "$version" ]]; then
+        local -a versions=($MARIADB_VERSIONS)
+        echo -e "\n${HEADER_COLOR}Select MariaDB version:${C_RESET}"
+        local -a opts=()
+        for v in "${versions[@]}"; do
+            opts+=("MariaDB ${v}")
+        done
+        local sel
+        sel=$(prompt_select "Choose version:" "${opts[@]}")
+        version="${sel#MariaDB }"
+    fi
+    if [[ -z "$root_password" ]]; then
+        echo -e "\n${HEADER_COLOR}Set MariaDB root password${C_RESET}"
+        prompt_password "Root password (leave empty for auto-generated)" root_password
+        if [[ -z "$root_password" ]]; then
+            root_password=$(gen_password 20)
+            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
+        fi
+    fi
 
     log_info "Installing MariaDB ${version}..."
 
@@ -153,7 +178,8 @@ mysql_install_mariadb() {
         return 1
     fi
 
-    mysql_secure
+    systemctl start mariadb 2>/dev/null || true
+    mysql_secure "$root_password"
 }
 
 mysql_secure() {
