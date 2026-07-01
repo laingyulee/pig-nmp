@@ -90,9 +90,7 @@ manager_quick_install() {
     echo -e "\n${HEADER_COLOR}=== Quick Install (NMP Stack) ===${C_RESET}"
     echo -e "  This will install Nginx + PHP ${PHP_VERSION_DEFAULT} + MySQL/MariaDB in one go.\n"
 
-    if ! confirm "Start quick installation?"; then
-        return 0
-    fi
+    echo -e "\n${HEADER_COLOR}Configure installation options:${C_RESET}"
 
     local db_sel
     db_sel=$(prompt_select "Select database:" "MariaDB 10.11" "MySQL 8.0")
@@ -110,6 +108,15 @@ manager_quick_install() {
     local php_method
     php_method=$(prompt_select "Select PHP installation method:" "APT - SURY repository (fast)" "Source compilation")
 
+    local setup_default_site=false
+    if confirm "Set up default site (catch-all for IP/unconfigured domains)?" "y"; then
+        setup_default_site=true
+    fi
+
+    if ! confirm "Start quick installation?"; then
+        return 0
+    fi
+
     log_info "Starting quick NMP stack installation..."
     ensure_dirs "${LOG_DIR}" "${RUN_DIR}" "${DATA_DIR}" "${ETC_DIR}" "${BACKUP_DIR}"
 
@@ -121,6 +128,9 @@ manager_quick_install() {
         if $step_ok; then
             nginx_setup_config
             systemctl start nginx &>/dev/null
+            if $setup_default_site; then
+                nginx_default_site_enable
+            fi
         fi
     fi
 

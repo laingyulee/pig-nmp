@@ -54,16 +54,19 @@ BACKUP_DIR="${DATA_DIR}/backups"
 
 PHP_FPM_PORTS_START=9081
 
-DOMAINS_DIR="/home/www/domains"
+DOMAINS_DIR="/home/www"
 
 ensure_domains_dir() {
     if [[ ! -d "${DOMAINS_DIR}" ]]; then
         mkdir -p "${DOMAINS_DIR}"
         log_info "Created domains directory: ${DOMAINS_DIR}"
+        chown www-data:www-data "${DOMAINS_DIR}"
+        chmod 755 "${DOMAINS_DIR}"
     fi
-    chown -R www-data:www-data "/home/www"
-    chmod 755 "/home/www"
-    chmod 755 "${DOMAINS_DIR}"
+    if [[ ! -d "${DOMAINS_DIR}/default" ]]; then
+        mkdir -p "${DOMAINS_DIR}/default"
+        chown www-data:www-data "${DOMAINS_DIR}/default"
+    fi
 }
 
 MIRROR_CN="false"
