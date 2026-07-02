@@ -325,7 +325,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .logo svg{width:100%;height:100%}
 h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
 p{color:#92929e;font-size:15px}
-.tag{display:inline-block;margin-top:24px;padding:4px 14px;border-radius:100px;background:rgba(212,161,71,.1);border:1px solid rgba(212,161,71,.2);font-size:12px;font-weight:500;color:#d4a147;letter-spacing:.04em;text-transform:uppercase}
+.tag{display:inline-flex;align-items:center;margin-top:24px;padding:4px 14px;border-radius:100px;background:rgba(212,161,71,.1);border:1px solid rgba(212,161,71,.2);font-size:12px;font-weight:500;color:#d4a147;letter-spacing:.04em;text-transform:uppercase}
 .dot{width:6px;height:6px;border-radius:50%;background:#4caf7d;display:inline-block;margin-right:6px;vertical-align:middle;animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
