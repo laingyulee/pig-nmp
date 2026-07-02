@@ -1,336 +1,146 @@
 #!/usr/bin/env bash
 #
-# Pig-NMP - OS Detection & Dependency Management
+# Pig-NMP - OS Detection & System Management
 #
 
-source "${LIB_DIR}/common.sh"
-
 OS_ID=""
-OS_VERSION=""
+OS_VERSION_ID=""
 OS_CODENAME=""
-OS_ARCH=""
+OS_FAMILY=""
 
 detect_os() {
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
-        OS_ID="${ID:-unknown}"
-        OS_VERSION="${VERSION_ID:-unknown}"
-        OS_CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo unknown)}"
+        OS_ID="${ID:-}"
+        OS_VERSION_ID="${VERSION_ID:-}"
+        OS_CODENAME="${VERSION_CODENAME:-}"
     elif [[ -f /etc/lsb-release ]]; then
         source /etc/lsb-release
         OS_ID="${DISTRIB_ID,,}"
-        [[ -z "$OS_ID" ]] && OS_ID="unknown"
-        OS_VERSION="${DISTRIB_RELEASE:-unknown}"
-        OS_CODENAME="${DISTRIB_CODENAME:-unknown}"
-    elif [[ -f /etc/debian_version ]]; then
-        OS_ID="debian"
-        OS_VERSION=$(cat /etc/debian_version | cut -d. -f1)
-        OS_CODENAME=$(lsb_release -cs 2>/dev/null || echo unknown)
-    else
-        OS_ID="unknown"
-        OS_VERSION="unknown"
-        OS_CODENAME="unknown"
+        OS_VERSION_ID="$DISTRIB_RELEASE"
+        OS_CODENAME="${DISTRIB_CODENAME,,}"
     fi
 
-    OS_ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m)
+    case "$OS_ID" in
+        ubuntu|debian|linuxmint) OS_FAMILY="debian" ;;
+        centos|rhel|rocky|almalinux|fedora) OS_FAMILY="rhel" ;;
+        *) OS_FAMILY="unknown" ;;
+    esac
 
-    export OS_ID OS_VERSION OS_CODENAME OS_ARCH
-
-    log_debug "Detected OS: ${OS_ID} ${OS_VERSION} (${OS_CODENAME}) arch=${OS_ARCH}"
+    log_debug "OS: ${OS_ID} ${OS_VERSION_ID} (${OS_CODENAME}) [${OS_FAMILY}]"
 }
 
 require_os() {
-    if [[ -z "$OS_ID" ]]; then
-        detect_os
-    fi
-    case "$OS_ID" in
-        debian|ubuntu|linuxmint|pop)
-            return 0
-            ;;
-        *)
-            die "Unsupported OS: ${OS_ID}. This script requires Debian/Ubuntu."
-            ;;
-    esac
+    detect_os
+    [[ "$OS_FAMILY" != "debian" ]] && die "This component requires Debian/Ubuntu. Detected: ${OS_ID}"
 }
 
 _pkg_is_installed() {
-    # Use dpkg-query to check the exact Status field. `dpkg -s` returns 0 even for
-    # packages in 'rc' state (removed but config files remain), which would cause
-    # install_deps to skip packages that are actually missing their binaries.
-    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q '^install ok installed$'
+    local pkg="$1"
+    local status
+    status=$(dpkg -s "$pkg" 2>/dev/null | grep '^Status:')
+    [[ "$status" == *"install ok installed"* ]]
 }
 
 install_deps() {
-    local -a pkgs=("$@")
-    local -a missing=()
-
-    for pkg in "${pkgs[@]}"; do
+    local pkg
+    for pkg in "$@"; do
         if ! _pkg_is_installed "$pkg"; then
-            missing+=("$pkg")
+            log_info "Installing ${pkg}..."
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" 2>/dev/null || {
+                log_warn "Failed to install ${pkg}"
+                return 1
+            }
         fi
     done
-
-    if [[ ${#missing[@]} -eq 0 ]]; then
-        log_debug "All packages already installed"
-        return 0
-    fi
-
-    log_info "Installing dependencies: ${missing[*]}"
-    apt-get update -qq 2>/dev/null
-
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" 2>/dev/null || true
-
-    local -a still_missing=()
-    for pkg in "${missing[@]}"; do
-        if ! _pkg_is_installed "$pkg"; then
-            still_missing+=("$pkg")
-        fi
-    done
-
-    if [[ ${#still_missing[@]} -eq 0 ]]; then
-        log_success "Dependencies installed"
-    else
-        log_warn "Some packages could not be installed: ${still_missing[*]}"
-        log_warn "This may not be critical - continuing..."
-    fi
 }
 
 install_build_deps() {
-    local -a pkgs=(
-        build-essential
-        autoconf
-        automake
-        libtool
-        pkg-config
-        cmake
-        git
-        wget
-        curl
-        ca-certificates
-        gnupg
-        lsb-release
-        software-properties-common
-        apt-transport-https
-        libssl-dev
-        zlib1g-dev
-        libpcre3-dev
-        libargon2-dev
-        libsodium-dev
-        libcurl4-openssl-dev
-        libxml2-dev
-        libsqlite3-dev
-        libonig-dev
-        libzip-dev
-        libbz2-dev
-        libreadline-dev
-        libicu-dev
-        libgd-dev
-        libwebp-dev
-        libjpeg-dev
-        libpng-dev
-        libxpm-dev
-        libfreetype6-dev
-        libgmp-dev
-        libldap2-dev
-        libpq-dev
-        libmagickwand-dev
-        libmagickcore-dev
-        imagemagick
-        libmemcached-dev
-        libyaml-dev
-        libxslt1-dev
+    local -a deps=(
+        build-essential autoconf automake libtool cmake pkg-config
+        bison re2c zlib1g-dev libxml2-dev libssl-dev libcurl4-openssl-dev
+        libpng-dev libjpeg-dev libwebp-dev libfreetype6-dev
+        libonig-dev libzip-dev libbz2-dev libsqlite3-dev libgmp-dev
+        libreadline-dev libffi-dev libicu-dev libxslt1-dev
+        libldap2-dev libsodium-dev
     )
-    install_deps "${pkgs[@]}"
+    install_deps "${deps[@]}"
+}
 
-    local -a optional_pkgs=(
-        unixodbc-dev
-        libenchant-2-dev
-        libpcre2-dev
-    )
-    for pkg in "${optional_pkgs[@]}"; do
-        if ! dpkg -l "$pkg" 2>/dev/null | grep -q '^ii'; then
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" 2>/dev/null || \
-                log_warn "Optional package ${pkg} not available, skipping"
+apt_remove() {
+    local pkg
+    for pkg in "$@"; do
+        if _pkg_is_installed "$pkg"; then
+            DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq "$pkg" 2>/dev/null
         fi
     done
 }
 
-add_apt_key() {
-    local url="$1"
-    local keyring="$2"
-    rm -f "$keyring"
-    curl -fsSL "$url" | gpg --dearmor -o "$keyring"
-    chmod 644 "$keyring"
-}
-
-add_apt_repo() {
-    local repo_line="$1"
-    local keyring="$2"
-    echo "$repo_line" > /etc/apt/sources.list.d/"$(echo "$repo_line" | awk '{print $3}')".list
-    apt-get update -qq 2>/dev/null
-}
-
-apt_install() {
-    local -a pkgs=("$@")
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${pkgs[@]}" 2>/dev/null
-}
-
-apt_remove() {
-    local -a pkgs=("$@")
-    DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq "${pkgs[@]}" 2>/dev/null
-    apt-get autoremove -y -qq 2>/dev/null
-}
-
-set_locale() {
-    install_deps locales
-    local locale="${1:-en_US.UTF-8}"
-    if ! locale -a 2>/dev/null | grep -qi "${locale//_/}"; then
-        sed_inplace /etc/locale.gen "s/# ${locale}/${locale}/"
-        locale-gen "$locale" &>/dev/null
-    fi
-    export LC_ALL="$locale"
-    export LANG="$locale"
-}
-
 setup_swap() {
-    local size="${1:-2G}"
-    if swapon --show | grep -q pv; then
-        log_info "Swap already exists"
+    local swap_total
+    swap_total=$(awk '/SwapTotal/{print $2}' /proc/meminfo 2>/dev/null)
+    swap_total=${swap_total:-0}
+
+    if (( swap_total > 0 )); then
+        log_info "Swap already configured ($(( swap_total / 1024 ))MB)"
         return 0
     fi
-    if [[ $(awk '/MemTotal/{print $2}' /proc/meminfo) -lt 2000000 ]]; then
-        log_info "Creating swap file (${size})..."
-        fallocate -l "$size" /swapfile
-        chmod 600 /swapfile
-        mkswap /swapfile &>/dev/null
-        swapon /swapfile
-        echo '/swapfile none swap sw 0 0' >> /etc/fstab
-        sysctl vm.swappiness=10 &>/dev/null
-        log_success "Swap created"
+
+    if (( SYSCTL_MEM < 2097152 )); then
+        log_info "Low memory detected, creating 2GB swap..."
+        local swapfile="/swapfile"
+        fallocate -l 2G "$swapfile" 2>/dev/null || dd if=/dev/zero of="$swapfile" bs=1M count=2048 2>/dev/null
+        chmod 600 "$swapfile"
+        mkswap "$swapfile" &>/dev/null
+        swapon "$swapfile" &>/dev/null
+        grep -q "$swapfile" /etc/fstab || echo "$swapfile none swap sw 0 0" >> /etc/fstab
+        log_success "Swap created: 2GB"
     fi
 }
 
 optimize_system() {
-    local -a sysctl_conf=(
-        "net.core.somaxconn=65535"
-        "net.ipv4.tcp_max_syn_backlog=65535"
-        "net.ipv4.tcp_tw_reuse=1"
-        "net.ipv4.ip_local_port_range=1024 65535"
-        "fs.file-max=1048576"
-        "vm.overcommit_memory=1"
-        "vm.swappiness=10"
-    )
+    log_info "Optimizing system settings..."
 
-    for conf in "${sysctl_conf[@]}"; do
-        local key="${conf%%=*}"
-        local value="${conf#*=}"
-        if grep -q "^${key}" /etc/sysctl.conf 2>/dev/null; then
-            local current
-            current=$(grep "^${key}" /etc/sysctl.conf 2>/dev/null | head -1)
-            if [[ "$current" != "$conf" ]]; then
-                sed_inplace /etc/sysctl.conf "s|^${key}.*|${conf}|"
-                log_debug "Updated sysctl: ${conf}"
-            fi
-        else
-            echo "$conf" >> /etc/sysctl.conf
-        fi
-    done
-    sysctl -p &>/dev/null
+    local sysctl_file="/etc/sysctl.d/99-pig-nmp.conf"
+    cat > "$sysctl_file" << 'SYSCTL'
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.core.netdev_max_backlog = 65535
+vm.swappiness = 10
+fs.file-max = 655350
+fs.inotify.max_user_watches = 524288
+SYSCTL
+    sysctl -p "$sysctl_file" &>/dev/null
 
-    cat > /etc/security/limits.d/pig-nmp.conf << EOF
-* soft nofile 1048576
-* hard nofile 1048576
-* soft nproc 65535
-* hard nproc 65535
-root soft nofile 1048576
-root hard nofile 1048576
-EOF
+    local limits_file="/etc/security/limits.d/99-pig-nmp.conf"
+    cat > "$limits_file" << 'LIMITS'
+* soft nofile 655350
+* hard nofile 655350
+* soft nproc 655350
+* hard nproc 655350
+www-data soft nofile 655350
+www-data hard nofile 655350
+LIMITS
 
+    setup_swap
     setup_logrotate
-
     log_success "System optimized"
 }
 
 setup_logrotate() {
-    local logrotate_conf="/etc/logrotate.d/pig-nmp"
-    if [[ -f "$logrotate_conf" ]]; then
-        return 0
-    fi
-    cat > "$logrotate_conf" << EOF
-${LOG_DIR}/nginx/*.log {
+    local logrotate_file="/etc/logrotate.d/pig-nmp"
+    cat > "$logrotate_file" << 'LOGROTATE'
+/var/log/pig-nmp/*.log {
     daily
-    missingok
-    rotate 14
+    rotate 30
     compress
     delaycompress
-    notifempty
-    create 640 www-data www-data
-    sharedscripts
-    postrotate
-        [ -f ${RUN_DIR}/nginx.pid ] && kill -USR1 \$(cat ${RUN_DIR}/nginx.pid) 2>/dev/null || true
-    endscript
-}
-
-${LOG_DIR}/php*.log {
-    daily
     missingok
-    rotate 14
-    compress
-    delaycompress
     notifempty
-    create 640 www-data www-data
-    sharedscripts
-    postrotate
-        for unit in /etc/systemd/system/php*-fpm.service /lib/systemd/system/php*-fpm.service; do
-            [ -f "\$unit" ] && systemctl reload "\$(basename "\$unit" .service)" 2>/dev/null || true
-        done
-    endscript
+    create 0644 www-data www-data
 }
-
-${LOG_DIR}/mysql/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    create 640 mysql adm
-    sharedscripts
-    postrotate
-        [ -f ${RUN_DIR}/mysqld.pid ] && mysqladmin flush-logs 2>/dev/null || true
-    endscript
+LOGROTATE
 }
-
-${LOG_DIR}/redis/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    create 640 redis redis
-}
-
-${LOG_DIR}/memcached/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    create 640 memcache memcache
-}
-
-${LOG_DIR}/vsftpd/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    create 640 www-data www-data
-}
-EOF
-    log_info "Logrotate configured for Pig-NMP services"
-}
-

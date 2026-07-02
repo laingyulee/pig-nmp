@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
-# Pig-NMP - Nginx/MySQL(MariaDB)/PHP Environment Manager
-# Global Configuration
+# Pig-NMP - Global Configuration
 #
 
-PIG_NMP_VERSION="1.0.0"
+PIG_NMP_VERSION="1.1.0"
 PIG_NMP_NAME="Pig-NMP"
 
 PIG_NMP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,38 +35,11 @@ REDIS_DIR="${INSTALL_PREFIX}/redis"
 REDIS_ETC_DIR="${ETC_DIR}/redis"
 REDIS_DATA_DIR="${DATA_DIR}/redis"
 
-MEMCACHED_DIR="${INSTALL_PREFIX}/memcached"
-MEMCACHED_ETC_DIR="${ETC_DIR}/memcached"
-
-PHPMYADMIN_DIR="${INSTALL_PREFIX}/phpmyadmin"
-PHPMYADMIN_ETC_DIR="${ETC_DIR}/phpmyadmin"
-
-FTP_ETC_DIR="${ETC_DIR}/vsftpd"
-FTP_USER_DIR="${ETC_DIR}/vsftpd/users"
-
-IONCUBE_DIR="${INSTALL_PREFIX}/ioncube"
-
-ACME_DIR="${INSTALL_PREFIX}/acme.sh"
 SSL_DIR="${ETC_DIR}/ssl"
-
 BACKUP_DIR="${DATA_DIR}/backups"
 
 PHP_FPM_PORTS_START=9081
-
 DOMAINS_DIR="/home/www"
-
-ensure_domains_dir() {
-    if [[ ! -d "${DOMAINS_DIR}" ]]; then
-        mkdir -p "${DOMAINS_DIR}"
-        log_info "Created domains directory: ${DOMAINS_DIR}"
-        chown www-data:www-data "${DOMAINS_DIR}"
-        chmod 755 "${DOMAINS_DIR}"
-    fi
-    if [[ ! -d "${DOMAINS_DIR}/default" ]]; then
-        mkdir -p "${DOMAINS_DIR}/default"
-        chown www-data:www-data "${DOMAINS_DIR}/default"
-    fi
-}
 
 MIRROR_CN="false"
 

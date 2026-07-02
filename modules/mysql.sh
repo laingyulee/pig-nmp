@@ -3,16 +3,14 @@
 # Pig-NMP - MySQL/MariaDB Module
 #
 
-source "${CONF_DIR}/versions.conf"
-
 mysql_is_installed() {
-    is_installed mysql || is_installed mariadb || [[ -x /usr/sbin/mysqld ]]
+    command -v mysql &>/dev/null || command -v mariadb &>/dev/null
 }
 
 mysql_get_type() {
-    if is_installed mariadb || dpkg -l mariadb-server 2>/dev/null | grep -q '^ii'; then
+    if command -v mariadb &>/dev/null; then
         echo "mariadb"
-    elif is_installed mysql || dpkg -l mysql-server 2>/dev/null | grep -q '^ii'; then
+    elif command -v mysql &>/dev/null; then
         echo "mysql"
     else
         echo "none"
@@ -20,410 +18,268 @@ mysql_get_type() {
 }
 
 mysql_get_version() {
-    local type
-    type=$(mysql_get_type)
-    if [[ "$type" == "mariadb" ]]; then
-        mariadb --version 2>/dev/null | grep -oP 'Distrib\s+\K[\d.]+' | head -1
-    elif [[ "$type" == "mysql" ]]; then
-        mysql --version 2>/dev/null | grep -oP 'Distrib\s+\K[\d.]+' | head -1
-    fi
+    local type=$(mysql_get_type)
+    case "$type" in
+        mariadb) mariadb --version 2>&1 | grep -oP '[\d.]+-MariaDB' | head -1 ;;
+        mysql)   mysql --version 2>&1 | grep -oP 'Ver \K[\d.]+' ;;
+        *)       echo "unknown" ;;
+    esac
 }
 
 mysql_install() {
     if mysql_is_installed; then
-        log_warn "$(mysql_get_type | tr '[:lower:]' '[:upper:]') is already installed: $(mysql_get_version)"
-        if ! confirm "Reinstall?"; then
-            return 0
-        fi
+        log_warn "MySQL/MariaDB is already installed: $(mysql_get_type) $(mysql_get_version)"
+        confirm "Reinstall?" || return 0
+        mysql_uninstall
     fi
 
-    echo -e "\n${HEADER_COLOR}Select database server:${C_RESET}"
     local db_type
-    db_type=$(prompt_select "Choose database:" "MySQL" "MariaDB" "Cancel")
-    [[ "$db_type" == "Cancel" ]] && return 0
-
+    db_type=$(prompt_select "Choose database:" "MySQL 8.0" "MariaDB 10.11")
     case "$db_type" in
-        MySQL)  mysql_install_mysql ;;
-        MariaDB) mysql_install_mariadb ;;
+        MySQL*)    mysql_install_mysql ;;
+        MariaDB*)  mysql_install_mariadb ;;
     esac
 }
 
 mysql_install_mysql() {
     require_os
+    log_info "Installing MySQL..."
 
-    local version="${1:-}"
-    local root_password="${2:-}"
-    if [[ -z "$version" ]]; then
-        local -a versions=($MYSQL_VERSIONS)
-        echo -e "\n${HEADER_COLOR}Select MySQL version:${C_RESET}"
-        local -a opts=()
-        for v in "${versions[@]}"; do
-            opts+=("MySQL ${v}")
-        done
-        local sel
-        sel=$(prompt_select "Choose version:" "${opts[@]}")
-        version="${sel#MySQL }"
-    fi
-    if [[ -z "$root_password" ]]; then
-        echo -e "\n${HEADER_COLOR}Set MySQL root password${C_RESET}"
-        prompt_password "Root password (leave empty for auto-generated)" root_password
-        if [[ -z "$root_password" ]]; then
-            root_password=$(gen_password 20)
-            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
-        fi
-    fi
+    local version
+    version=$(prompt_select "Select MySQL version:" "8.0" "8.4" "9.1")
 
-    log_info "Installing MySQL ${version}..."
-
-    install_deps wget curl gnupg lsb-release
-
-    local keyring="/usr/share/keyrings/mysql-archive-keyring.gpg"
-    rm -f "$keyring"
-
-    local gpg_key_url="https://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
-    curl -fsSL "$gpg_key_url" | gpg --dearmor -o "$keyring" 2>/dev/null || {
-        log_warn "MySQL GPG key import failed, trying fallback..."
-        curl -fsSL "https://repo.mysql.com/RPM-GPG-KEY-mysql" | gpg --dearmor -o "$keyring" 2>/dev/null || {
-            log_error "Failed to import MySQL GPG key"
-            return 1
-        }
-    }
-    chmod 644 "$keyring"
-
-    local deb_url="$MYSQL_APT_URL"
-    local deb_file="${TMP_DIR}/mysql-apt-config.deb"
+    # Use MySQL APT repository
+    local deb_pkg="mysql-apt-config_0.8.33-1_all.deb"
+    local tmp_deb="${TMP_DIR}/${deb_pkg}"
     ensure_dirs "$TMP_DIR"
 
-    download_file "$deb_url" "$deb_file" || return 1
+    log_info "Setting up MySQL APT repository..."
+    download_file "https://dev.mysql.com/get/${deb_config_url:-mysql-apt-config_0.8.33-1_all.deb}" "$tmp_deb" || {
+        log_error "Failed to download MySQL APT config"; return 1
+    }
 
-    DEBIAN_FRONTEND=noninteractive dpkg -i "$deb_file" 2>/dev/null
+    DEBIAN_FRONTEND=noninteractive dpkg -i "$tmp_deb" 2>/dev/null
+    apt-get update -qq 2>&1 | tail -3
 
-    echo "mysql-apt-config mysql-apt-config/select-server select mysql-${version}" | debconf-set-selections 2>/dev/null
-    DEBIAN_FRONTEND=noninteractive dpkg --configure -a 2>/dev/null
+    log_info "Installing MySQL ${version}..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server 2>&1 | tail -5
+    local ret=$?
 
-    apt-get update -qq 2>/dev/null
-
-    local pkg_name="mysql-server"
-    if [[ "$version" != "8.0" ]]; then
-        pkg_name="mysql-server"
+    if [[ $ret -ne 0 ]]; then
+        log_error "Failed to install MySQL"; return 1
     fi
 
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ${pkg_name} 2>/dev/null
+    systemctl enable mysql &>/dev/null
+    systemctl start mysql &>/dev/null
 
-    if [[ $? -eq 0 ]]; then
-        log_success "MySQL ${version} installed"
+    if is_service_active mysql; then
+        log_success "MySQL installed and running"
+        mysql_secure
     else
-        log_error "Failed to install MySQL ${version}"
-        return 1
+        log_warn "MySQL installed but failed to start"
     fi
-
-    mysql_setup_config
-    systemctl restart mysql 2>/dev/null || systemctl start mysql 2>/dev/null || true
-    mysql_secure "$root_password"
 }
 
 mysql_install_mariadb() {
     require_os
+    log_info "Installing MariaDB..."
 
-    local version="${1:-}"
-    local root_password="${2:-}"
-    if [[ -z "$version" ]]; then
-        local -a versions=($MARIADB_VERSIONS)
-        echo -e "\n${HEADER_COLOR}Select MariaDB version:${C_RESET}"
-        local -a opts=()
-        for v in "${versions[@]}"; do
-            opts+=("MariaDB ${v}")
-        done
-        local sel
-        sel=$(prompt_select "Choose version:" "${opts[@]}")
-        version="${sel#MariaDB }"
-    fi
-    if [[ -z "$root_password" ]]; then
-        echo -e "\n${HEADER_COLOR}Set MariaDB root password${C_RESET}"
-        prompt_password "Root password (leave empty for auto-generated)" root_password
-        if [[ -z "$root_password" ]]; then
-            root_password=$(gen_password 20)
-            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
-        fi
-    fi
+    local version
+    version=$(prompt_select "Select MariaDB version:" "10.11" "11.4" "11.6")
 
-    log_info "Installing MariaDB ${version}..."
-
-    install_deps wget curl gnupg lsb-release
-
+    # Import MariaDB GPG key
     local keyring="/usr/share/keyrings/mariadb-archive-keyring.gpg"
-    rm -f "$keyring"
-
-    log_info "Importing MariaDB GPG key..."
-    if ! curl -fsSL https://mariadb.org/mariadb_release_signing_key.pgp | gpg --dearmor -o "$keyring" 2>/dev/null; then
-        log_warn "Primary key download failed, trying alternative..."
-        rm -f "$keyring"
-        if ! curl -fsSL https://downloads.mariadb.com/MariaDB/mariadb-keyring-2019.gpg -o "$keyring" 2>/dev/null; then
-            log_error "Failed to import MariaDB GPG key"
-            return 1
-        fi
-    fi
+    curl -fsSL https://mariadb.org/mariadb_release_signing_key.pgp | gpg --dearmor -o "$keyring" 2>/dev/null || {
+        log_error "Failed to import MariaDB GPG key"; return 1
+    }
     chmod 644 "$keyring"
 
-    local repo_line="deb [arch=${OS_ARCH} signed-by=${keyring}] https://deb.mariadb.org/${version}/${OS_ID} ${OS_CODENAME} main"
-    echo "$repo_line" > /etc/apt/sources.list.d/mariadb.list
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://deb.mariadb.org/${version}/${OS_ID} ${OS_CODENAME} main" \
+        > /etc/apt/sources.list.d/mariadb.list
 
-    apt-get update -qq 2>/dev/null
+    apt-get update -qq 2>&1 | tail -3
 
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mariadb-server mariadb-client 2>/dev/null
+    log_info "Installing MariaDB ${version}..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mariadb-server 2>&1 | tail -5
+    local ret=$?
 
-    if [[ $? -eq 0 ]]; then
-        log_success "MariaDB ${version} installed"
-    else
-        log_error "Failed to install MariaDB ${version}"
-        return 1
+    if [[ $ret -ne 0 ]]; then
+        log_error "Failed to install MariaDB"; return 1
     fi
 
-    mysql_setup_config
-    systemctl restart mariadb 2>/dev/null || systemctl start mariadb 2>/dev/null || true
-    mysql_secure "$root_password"
+    systemctl enable mariadb &>/dev/null
+    systemctl start mariadb &>/dev/null
+
+    if is_service_active mariadb; then
+        log_success "MariaDB installed and running"
+        mysql_secure
+    else
+        log_warn "MariaDB installed but failed to start"
+    fi
 }
 
 mysql_secure() {
-    echo -e "\n${HEADER_COLOR}=== MySQL/MariaDB Security Setup ===${C_RESET}"
-
-    local root_password="${1:-}"
-    if [[ -z "$root_password" ]] && [[ -f "${MYSQL_ETC_DIR}/.root_password" ]]; then
-        root_password=$(grep '^ROOT_PASSWORD=' "${MYSQL_ETC_DIR}/.root_password" | cut -d= -f2)
-    fi
-    if [[ -z "$root_password" ]]; then
-        prompt_password "Set root password (leave empty for auto-generated)" root_password
-        if [[ -z "$root_password" ]]; then
-            root_password=$(gen_password 20)
-            log_info "Generated root password: ${C_BOLD}${root_password}${C_RESET}"
+    local root_pass="$1"
+    if [[ -z "$root_pass" ]]; then
+        # Try to read saved password
+        local pass_file="${MYSQL_ETC_DIR}/.root_password"
+        if [[ -f "$pass_file" ]]; then
+            root_pass=$(cat "$pass_file")
+        else
+            prompt_password "Set root password" root_pass
+            [[ -z "$root_pass" ]] && { log_error "Root password cannot be empty"; return 1; }
         fi
     fi
 
-    local db_type
-    db_type=$(mysql_get_type)
+    log_info "Securing MySQL installation..."
 
-    systemctl start mysql mariadb mysqld 2>/dev/null || true
-    local wait_attempts=0
-    while ! mysqladmin ping --silent 2>/dev/null && [[ $wait_attempts -lt 10 ]]; do
-        sleep 2
-        wait_attempts=$((wait_attempts + 1))
-    done
-
-    local escaped_password
-    escaped_password="${root_password//\'/\\\'}"
-    escaped_password="${escaped_password//\\/\\\\}"
-
-    local tmp_cnf=""
-    local mysql_cmd="mysql -u root"
-    if ! mysql -u root -e "SELECT 1" &>/dev/null; then
-        # Passwordless auth (e.g. auth_socket) is not available; use credentials.
-        tmp_cnf="${TMP_DIR}/.mysql_secure_$$.cnf"
-        ensure_dirs "$TMP_DIR"
-        cat > "$tmp_cnf" << EOF
-[client]
-user=root
-password=${root_password}
-EOF
-        chmod 600 "$tmp_cnf"
-        mysql_cmd="mysql --defaults-extra-file=${tmp_cnf}"
-    fi
-
-    if [[ "$db_type" == "mariadb" ]]; then
-        $mysql_cmd <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_password}';
+    local sql=$(cat <<EOSQL
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${root_pass}';
 DELETE FROM mysql.user WHERE User='';
 DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
-EOF
-    else
-        $mysql_cmd <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_password}';
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-FLUSH PRIVILEGES;
-EOF
-    fi
+EOSQL
+)
 
-    [[ -n "$tmp_cnf" ]] && rm -f "$tmp_cnf"
+    mysql -u root -e "$sql" 2>/dev/null || \
+    mysql -u root -p"${root_pass}" -e "$sql" 2>/dev/null || \
+    mysqladmin -u root password "${root_pass}" 2>/dev/null
 
     ensure_dirs "${MYSQL_ETC_DIR}"
-    cat > "${MYSQL_ETC_DIR}/.root_password" <<EOF
-# Generated by Pig-NMP
-# Date: $(date '+%Y-%m-%d %H:%M:%S')
-DB_TYPE=${db_type}
-ROOT_PASSWORD=${root_password}
-EOF
+    echo "$root_pass" > "${MYSQL_ETC_DIR}/.root_password"
     chmod 600 "${MYSQL_ETC_DIR}/.root_password"
 
-    log_success "MySQL/MariaDB secured. Root password saved to ${MYSQL_ETC_DIR}/.root_password"
-    log_warn "${C_RED}Please save the root password in a safe place!${C_RESET}"
+    log_success "MySQL secured successfully"
 }
 
 mysql_create_database() {
-    local db_name db_user db_pass
-    prompt_input "Database name" "" db_name
-    [[ -z "$db_name" ]] && return 1
-    prompt_input "Database user" "$db_name" db_user
-    prompt_password "Database password (leave empty for auto-generated)" db_pass
+    local db_name="$1" db_user="$2" db_pass="$3"
+    [[ -z "$db_name" ]] && prompt_input "Database name" "" db_name
+    [[ -z "$db_user" ]] && prompt_input "Database user" "" db_user
     [[ -z "$db_pass" ]] && db_pass=$(gen_password 16)
 
-    local root_pass
-    if [[ -f "${MYSQL_ETC_DIR}/.root_password" ]]; then
-        root_pass=$(grep '^ROOT_PASSWORD=' "${MYSQL_ETC_DIR}/.root_password" | cut -d= -f2)
-    else
-        prompt_password "MySQL root password" root_pass
-    fi
+    local root_pass=""
+    local pass_file="${MYSQL_ETC_DIR}/.root_password"
+    [[ -f "$pass_file" ]] && root_pass=$(cat "$pass_file")
 
-    local escaped_pass="${db_pass//\'/\\\'}"
-    escaped_pass="${escaped_pass//\\/\\\\}"
-    local escaped_user="${db_user//\'/\\\'}"
-    escaped_user="${escaped_user//\\/\\\\}"
-
-    local tmp_mysql_cnf="${TMP_DIR}/.mysql_creds_$$.cnf"
-    ensure_dirs "$TMP_DIR"
-    cat > "$tmp_mysql_cnf" << EOF
-[client]
-user=root
-password=${root_pass}
-EOF
-    chmod 600 "$tmp_mysql_cnf"
-
-    mysql --defaults-extra-file="$tmp_mysql_cnf" <<EOF
+    local sql=$(cat <<EOSQL
 CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${escaped_user}'@'localhost' IDENTIFIED BY '${escaped_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${escaped_user}'@'localhost';
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
 FLUSH PRIVILEGES;
-EOF
-    local ret=$?
+EOSQL
+)
 
-    rm -f "$tmp_mysql_cnf"
+    mysql -u root -p"${root_pass}" -e "$sql" 2>/dev/null || \
+    mysql -u root -e "$sql" 2>/dev/null || {
+        log_error "Failed to create database"; return 1
+    }
 
-    if [[ $ret -eq 0 ]]; then
-        log_success "Database created: ${db_name}"
-        echo -e "  ${C_GREEN}DB:     ${C_RESET}${db_name}"
-        echo -e "  ${C_GREEN}User:   ${C_RESET}${db_user}"
-        echo -e "  ${C_GREEN}Pass:   ${C_RESET}${db_pass}"
-    else
-        log_error "Failed to create database"
-    fi
+    log_success "Database '${db_name}' created with user '${db_user}'"
+    echo -e "  ${C_BOLD}Database:${C_RESET} ${db_name}"
+    echo -e "  ${C_BOLD}User:${C_RESET}     ${db_user}"
+    echo -e "  ${C_BOLD}Password:${C_RESET} ${db_pass}"
 }
 
 mysql_setup_config() {
-    local db_type
-    db_type=$(mysql_get_type)
+    local type=$(mysql_get_type)
+    local conf_dir
+    [[ "$type" == "mariadb" ]] && conf_dir="/etc/mysql/mariadb.conf.d" || conf_dir="/etc/mysql/conf.d"
+    ensure_dirs "$conf_dir"
 
-    # APT-installed MySQL/MariaDB stores data in /var/lib/mysql, not /var/lib/pig-nmp/mysql.
-    # Write a managed snippet to /etc/mysql/conf.d/ so it is actually loaded by the
-    # default /etc/mysql/my.cnf include chain. Also keep a copy in MYSQL_ETC_DIR for
-    # the script's own reference / backup.
-    local real_data_dir="/var/lib/mysql"
-    ensure_dirs "${MYSQL_ETC_DIR}" "${real_data_dir}" "${LOG_DIR}/mysql" "/etc/mysql/conf.d"
+    local conf_file="${conf_dir}/pig-nmp.cnf"
+    local innodb_buffer=$(($SYSCTL_MEM / 1024 / 4))  # 25% of RAM in MB
+    (( innodb_buffer < 256 )) && innodb_buffer=256
 
-    local my_cnf="${MYSQL_ETC_DIR}/my.cnf"
-    local drop_in="/etc/mysql/conf.d/pig-nmp.cnf"
-    local mem_mb=$((SYSCTL_MEM / 1024))
-    local innodb_buf=$((mem_mb * 70 / 100))
+    cat > "$conf_file" << EOF
+[mysqld]
+innodb_buffer_pool_size = ${innodb_buffer}M
+innodb_log_file_size = 128M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+max_connections = 200
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+skip-name-resolve
 
-    if [[ ! -f "$my_cnf" ]]; then
-        render_template "${TEMPLATES_DIR}/mysql/my.cnf.tpl" "$my_cnf" \
-            DB_TYPE="${db_type}" \
-            MYSQL_DATA_DIR="${real_data_dir}" \
-            MYSQL_ETC_DIR="${MYSQL_ETC_DIR}" \
-            LOG_DIR="${LOG_DIR}" \
-            INNODB_BUFFER_POOL="${innodb_buf}M" \
-            MAX_CONNECTIONS="200" \
-            SERVER_ID="1"
-    fi
+[client]
+default-character-set = utf8mb4
+EOF
 
-    # Publish to the location MySQL actually loads from. Always overwrite so our
-    # managed settings take precedence over the vendor defaults.
-    cp -f "$my_cnf" "$drop_in"
-    chmod 644 "$drop_in"
+    log_success "MySQL config written to ${conf_file}"
 }
 
 mysql_uninstall() {
-    if ! mysql_is_installed; then
-        log_warn "MySQL/MariaDB is not installed"
-        return 0
-    fi
-
-    local db_type
-    db_type=$(mysql_get_type)
-
-    if ! confirm "Uninstall ${db_type}? This will stop the service and remove packages."; then
-        return 0
-    fi
+    mysql_is_installed || { log_warn "MySQL/MariaDB is not installed"; return 0; }
+    confirm "Uninstall MySQL/MariaDB? All databases will be lost!" || return 0
 
     local keep_data="n"
-    if confirm "Keep data files?"; then
-        keep_data="y"
-    fi
+    confirm "Keep data files (databases)?" "y" && keep_data="y"
 
-    systemctl stop mysql mariadb mysqld 2>/dev/null
+    local type=$(mysql_get_type)
+    local service_name="mysql"
+    [[ "$type" == "mariadb" ]] && service_name="mariadb"
 
-    if [[ "$db_type" == "mariadb" ]]; then
-        apt_remove mariadb-server mariadb-client mariadb-common
-    else
-        apt_remove mysql-server mysql-client mysql-common
-    fi
+    systemctl stop "$service_name" &>/dev/null
+    systemctl disable "$service_name" &>/dev/null
+
+    DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq mysql-server mysql-client mysql-common 2>/dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq mariadb-server mariadb-client mariadb-common 2>/dev/null
+    apt-get autoremove -y -qq 2>/dev/null
+
+    rm -f /etc/apt/sources.list.d/mysql.list /etc/apt/sources.list.d/mariadb.list
+    rm -f /etc/systemd/system/mysqld.service
 
     if [[ "$keep_data" != "y" ]]; then
-        rm -rf /var/lib/mysql
-        rm -rf "${MYSQL_DATA_DIR}"
+        rm -rf /var/lib/mysql "${MYSQL_DATA_DIR}"
     fi
 
     rm -rf "${MYSQL_ETC_DIR}"
-    rm -f /etc/apt/sources.list.d/mariadb.list /etc/apt/sources.list.d/mysql.list
-    apt-get autoremove -y -qq 2>/dev/null
+    systemctl daemon-reload
 
-    log_success "${db_type} uninstalled"
+    log_success "MySQL/MariaDB uninstalled"
 }
 
 mysql_status() {
     echo -e "\n${HEADER_COLOR}=== MySQL/MariaDB Status ===${C_RESET}"
-    local db_type
-    db_type=$(mysql_get_type)
-    print_status "Type" "${db_type}"
     if mysql_is_installed; then
-        print_status "Version" "$(mysql_get_version)"
-        print_status "Service" "$(is_service_active mysql && echo 'running' || echo 'stopped')"
-        print_status "Port 3306" "$(port_in_use 3306 && echo 'in_use' || echo 'free')"
+        local type=$(mysql_get_type)
+        print_status "${type}" "installed"
+        echo -e "  Version: $(mysql_get_version)"
+        is_service_active mysql && print_status "Service" "running" || print_status "Service" "stopped"
+    else
+        print_status "MySQL/MariaDB" "not_installed"
     fi
 }
 
 mysql_menu() {
     while true; do
         echo -e "\n${HEADER_COLOR}=== MySQL/MariaDB Management ===${C_RESET}"
-        echo -e "  ${MENU_NUM_COLOR}1)${C_RESET} Install MySQL/MariaDB"
-        echo -e "  ${MENU_NUM_COLOR}2)${C_RESET} Uninstall"
+        echo -e "  ${MENU_NUM_COLOR}1)${C_RESET} Install MySQL / MariaDB"
+        echo -e "  ${MENU_NUM_COLOR}2)${C_RESET} Uninstall MySQL / MariaDB"
         echo -e "  ${MENU_NUM_COLOR}3)${C_RESET} Secure installation (set root password)"
-        echo -e "  ${MENU_NUM_COLOR}4)${C_RESET} Create database and user"
-        echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Start/Stop/Restart"
+        echo -e "  ${MENU_NUM_COLOR}4)${C_RESET} Create database"
+        echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Setup configuration"
         echo -e "  ${MENU_NUM_COLOR}6)${C_RESET} Status"
         echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
         echo ""
 
         local choice
         read -rp "$(echo -e "${C_CYAN}Enter choice:${C_RESET} ")" choice
-
         case "$choice" in
             1) mysql_install ;;
             2) mysql_uninstall ;;
             3) mysql_secure ;;
-            4) mysql_create_database ;;
-            5)
-                local action
-                action=$(prompt_select "Service action:" "Start" "Stop" "Restart")
-                case "$action" in
-                    Start)   systemctl start mysql mariadb 2>/dev/null ;;
-                    Stop)    systemctl stop mysql mariadb 2>/dev/null ;;
-                    Restart) systemctl restart mysql mariadb 2>/dev/null ;;
-                esac
+            4)
+                local db_name db_user db_pass
+                prompt_input "Database name" "" db_name
+                prompt_input "Database user" "" db_user
+                db_pass=$(gen_password 16)
+                mysql_create_database "$db_name" "$db_user" "$db_pass"
                 ;;
+            5) mysql_setup_config ;;
             6) mysql_status ;;
             0) return 0 ;;
             *) log_warn "Invalid choice" ;;
