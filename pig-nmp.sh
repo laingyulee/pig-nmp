@@ -225,7 +225,7 @@ cmd_purge() {
         [[ -n "$pkg" ]] && php_pkgs+=("$pkg")
     done < <(dpkg -l 2>/dev/null | awk '/^ii[[:space:]]+php[0-9]+\.[0-9]+/{print $2}')
     if [[ ${#php_pkgs[@]} -gt 0 ]]; then
-        DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq "${php_pkgs[@]}" 2>/dev/null || true
+        DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq "${php_pkgs[@]}" 2>/dev/null || true
     fi
 
     rm -f /etc/systemd/system/nginx.service /etc/systemd/system/php*-fpm*.service

@@ -249,36 +249,8 @@ php_install_apt() {
 php_setup_config_apt() {
     local ver="$1"
     local php_etc="${PHP_ETC_DIR}/php${ver}"
-    local php_fpm_sock
-    php_fpm_sock=$(get_php_fpm_sock "$ver")
-    local php_fpm_port
-    php_fpm_port=$(get_php_fpm_port "$ver")
 
-    ensure_dirs "${RUN_DIR}/php-fpm" "${LOG_DIR}/php-fpm"
-
-    local fpm_pool_dir="${php_etc}/fpm/pool.d"
-    ensure_dirs "$fpm_pool_dir"
-
-    local pool_conf="${fpm_pool_dir}/www.conf"
-    if [[ -f "$pool_conf" ]] && ! grep -q "pig-nmp" "$pool_conf" 2>/dev/null; then
-        backup_file "$pool_conf"
-    fi
-
-    if [[ ! -f "$pool_conf" ]] || ! grep -q "pig-nmp" "$pool_conf" 2>/dev/null; then
-        render_template "${TEMPLATES_DIR}/php/www.conf.tpl" "$pool_conf" \
-            POOL_NAME="www${ver}" \
-            PHP_FPM_USER="www-data" \
-            PHP_FPM_GROUP="www-data" \
-            PHP_FPM_LISTEN="${php_fpm_sock}" \
-            PHP_FPM_PORT="${php_fpm_port}" \
-            PHP_FPM_PM="dynamic" \
-            PHP_FPM_PM_MAX_CHILDREN="50" \
-            PHP_FPM_PM_START_SERVERS="5" \
-            PHP_FPM_PM_MIN_SPARE="3" \
-            PHP_FPM_PM_MAX_SPARE="10" \
-            PHP_FPM_PM_MAX_REQUESTS="1000" \
-            LOG_DIR="${LOG_DIR}"
-    fi
+    ensure_dirs "${LOG_DIR}/php-fpm"
 
     local ini_file="${php_etc}/fpm/php.ini"
     if [[ -f "$ini_file" ]]; then

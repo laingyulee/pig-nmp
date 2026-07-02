@@ -369,7 +369,7 @@ get_php_fpm_port() {
 
 get_php_fpm_sock() {
     local ver="$1"
-    echo "${RUN_DIR}/php-fpm/php${ver}.sock"
+    echo "/run/php/php${ver}-fpm.sock"
 }
 
 spinner() {
