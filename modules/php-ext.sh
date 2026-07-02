@@ -394,7 +394,19 @@ php_ext_disable() {
 
     rm -f "${mods_dir}/${ext}.ini"
 
-    local ini_file="${php_etc}/php.ini"
+    local method
+    method=$(php_install_method "$ver" 2>/dev/null)
+    if [[ "$method" == "apt" ]]; then
+        # APT PHP loads extensions via conf.d symlinks; remove them for all SAPIs.
+        local sapi
+        for sapi in fpm cli; do
+            local conf_d="/etc/php/${ver}/${sapi}/conf.d"
+            rm -f "${conf_d}/"*"-${ext}.ini"
+        done
+    fi
+
+    local ini_file
+    ini_file=$(php_get_ini_path "$ver")
     if [[ -f "$ini_file" ]]; then
         sed_inplace "$ini_file" "/extension=${ext}/d"
         sed_inplace "$ini_file" "/zend_extension.*${ext}/d"

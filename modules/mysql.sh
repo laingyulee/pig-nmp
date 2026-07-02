@@ -188,6 +188,9 @@ mysql_secure() {
     echo -e "\n${HEADER_COLOR}=== MySQL/MariaDB Security Setup ===${C_RESET}"
 
     local root_password="${1:-}"
+    if [[ -z "$root_password" ]] && [[ -f "${MYSQL_ETC_DIR}/.root_password" ]]; then
+        root_password=$(grep '^ROOT_PASSWORD=' "${MYSQL_ETC_DIR}/.root_password" | cut -d= -f2)
+    fi
     if [[ -z "$root_password" ]]; then
         prompt_password "Set root password (leave empty for auto-generated)" root_password
         if [[ -z "$root_password" ]]; then
@@ -210,8 +213,23 @@ mysql_secure() {
     escaped_password="${root_password//\'/\\\'}"
     escaped_password="${escaped_password//\\/\\\\}"
 
+    local tmp_cnf=""
+    local mysql_cmd="mysql -u root"
+    if ! mysql -u root -e "SELECT 1" &>/dev/null; then
+        # Passwordless auth (e.g. auth_socket) is not available; use credentials.
+        tmp_cnf="${TMP_DIR}/.mysql_secure_$$.cnf"
+        ensure_dirs "$TMP_DIR"
+        cat > "$tmp_cnf" << EOF
+[client]
+user=root
+password=${root_password}
+EOF
+        chmod 600 "$tmp_cnf"
+        mysql_cmd="mysql --defaults-extra-file=${tmp_cnf}"
+    fi
+
     if [[ "$db_type" == "mariadb" ]]; then
-        mysql -u root <<EOF
+        $mysql_cmd <<EOF
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_password}';
 DELETE FROM mysql.user WHERE User='';
 DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
@@ -220,7 +238,7 @@ DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
 EOF
     else
-        mysql -u root <<EOF
+        $mysql_cmd <<EOF
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_password}';
 DELETE FROM mysql.user WHERE User='';
 DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
@@ -229,6 +247,8 @@ DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
 EOF
     fi
+
+    [[ -n "$tmp_cnf" ]] && rm -f "$tmp_cnf"
 
     ensure_dirs "${MYSQL_ETC_DIR}"
     cat > "${MYSQL_ETC_DIR}/.root_password" <<EOF

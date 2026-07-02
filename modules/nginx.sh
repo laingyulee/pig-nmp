@@ -93,7 +93,6 @@ nginx_install_source() {
         --group=www-data
         --with-http_ssl_module
         --with-http_v2_module
-        --with-http_v3_module
         --with-http_realip_module
         --with-http_gzip_static_module
         --with-http_stub_status_module

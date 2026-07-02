@@ -18,7 +18,8 @@ detect_os() {
         OS_CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo unknown)}"
     elif [[ -f /etc/lsb-release ]]; then
         source /etc/lsb-release
-        OS_ID="${DISTRIB_ID,,:-unknown}"
+        OS_ID="${DISTRIB_ID,,}"
+        [[ -z "$OS_ID" ]] && OS_ID="unknown"
         OS_VERSION="${DISTRIB_RELEASE:-unknown}"
         OS_CODENAME="${DISTRIB_CODENAME:-unknown}"
     elif [[ -f /etc/debian_version ]]; then

@@ -149,7 +149,7 @@ manager_quick_install() {
         esac
         if $step_ok; then
             php_setup_config "$PHP_VERSION_DEFAULT"
-            systemctl start "php${PHP_VERSION_DEFAULT//./}-fpm" &>/dev/null || true
+            systemctl start "php${PHP_VERSION_DEFAULT}-fpm" &>/dev/null || true
         fi
     fi
 

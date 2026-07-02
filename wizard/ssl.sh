@@ -48,14 +48,23 @@ ssl_issue_letsencrypt() {
         local docroot="${DOMAINS_DIR}/${domain}"
         ensure_domains_dir
         ensure_dirs "$docroot"
+
+        local php_ver="" fpm_sock=""
+        local versions
+        versions=$(get_php_versions_installed)
+        if [[ -n "$versions" ]]; then
+            php_ver=$(php_select_version)
+            [[ -n "$php_ver" ]] && fpm_sock=$(get_php_fpm_sock "$php_ver")
+        fi
+
         render_template "${TEMPLATES_DIR}/nginx/vhost-http.conf.tpl" "$vhost_file" \
             DOMAIN="$domain" \
             DOCUMENT_ROOT="$docroot" \
-            PHP_FPM_SOCK="" \
-            PHP_VER="" \
+            PHP_FPM_SOCK="$fpm_sock" \
+            PHP_VER="$php_ver" \
             LOG_DIR="${LOG_DIR}" \
             NGINX_ETC_DIR="${NGINX_ETC_DIR}"
-        vhost_patch_php_block "$vhost_file" ""
+        vhost_patch_php_block "$vhost_file" "$fpm_sock"
         ln -sf "$vhost_file" "${NGINX_SITES_ENABLED}/${domain}.conf"
         nginx_reload
     fi
