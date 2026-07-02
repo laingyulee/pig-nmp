@@ -6,37 +6,13 @@
 <title>Pig-NMP — Nginx + MySQL/MariaDB + PHP Environment Manager / 环境管理工具</title>
 <meta name="description" content="Pig-NMP: One-command Nginx + MySQL/MariaDB + PHP environment manager for Debian/Ubuntu. Multi-version PHP, virtual host wizard, SSL certificates, and more. / 一行命令部署 Nginx + MySQL/MariaDB + PHP Web 环境，支持多版本 PHP、虚拟主机、SSL 证书等。">
 <style>
-:root {
-  --bg-primary: #0c0c10;
-  --bg-secondary: #121216;
-  --bg-card: #18181e;
-  --bg-card-hover: #1e1e26;
-  --bg-elevated: #22222c;
-  --border: #2a2a36;
-  --border-light: #363646;
-  --text-primary: #eaeaef;
-  --text-secondary: #92929e;
-  --text-tertiary: #6a6a76;
-  --accent: #d4a147;
-  --accent-soft: rgba(212, 161, 71, 0.12);
-  --accent-glow: rgba(212, 161, 71, 0.06);
-  --green: #4caf7d;
-  --cyan: #5bc0de;
-  --red: #e06050;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: Georgia, "Times New Roman", serif;
-  --font-mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", Consolas, monospace;
-  --max-width: 1040px;
-}
+:root{--bg-primary:#0c0c10;--bg-secondary:#121216;--bg-card:#18181e;--bg-card-hover:#1e1e26;--bg-elevated:#22222c;--border:#2a2a36;--border-light:#363646;--text-primary:#eaeaef;--text-secondary:#92929e;--text-tertiary:#6a6a76;--accent:#d4a147;--accent-soft:rgba(212,161,71,.12);--accent-glow:rgba(212,161,71,.06);--green:#4caf7d;--cyan:#5bc0de;--radius:12px;--radius-sm:8px;--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--font-serif:Georgia,"Times New Roman",serif;--font-mono:"SF Mono","Fira Code","Fira Mono","Roboto Mono",Consolas,monospace;--max-width:1040px}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth;font-size:16px}
-body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 ::selection{background:var(--accent);color:var(--bg-primary)}
 a{color:var(--accent);text-decoration:none;transition:color .2s}
 a:hover{color:#e8b860}
-img{max-width:100%}
 code{font-family:var(--font-mono);font-size:.875em}
 pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:auto}
 [data-lang="en"] .lang-zh{display:none!important}
@@ -46,7 +22,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
 .ambient-b{position:fixed;bottom:-30vh;left:-10vw;width:50vw;height:60vh;background:radial-gradient(ellipse at center,rgba(91,192,222,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
 .container{max-width:var(--max-width);margin:0 auto;padding:0 24px;position:relative;z-index:1}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border)}
-.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-weight:600;font-size:1.125rem;letter-spacing:-.01em;color:var(--text-primary)}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-weight:600;font-size:1.125rem;color:var(--text-primary)}
 .logo-mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--bg-primary);font-weight:700;font-family:var(--font-mono)}
 .lang-toggle{display:flex;gap:2px;background:var(--bg-card);border-radius:8px;padding:2px;border:1px solid var(--border)}
 .lang-btn{background:none;border:none;color:var(--text-tertiary);padding:6px 14px;border-radius:6px;cursor:pointer;font-family:var(--font-sans);font-size:.8125rem;font-weight:500;transition:all .25s}
@@ -103,12 +79,12 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
 .step-body .cmd-line{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;font-family:var(--font-mono);font-size:.8125rem;overflow-x:auto;display:block;color:var(--text-primary)}
 .step-body .cmd-line .prompt{color:var(--green)}
 .step-body .cmd-line .cmt{color:var(--text-tertiary);font-style:italic}
-.usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
-.usage-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
-.usage-card h3{font-size:.9375rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
-.usage-card h3 .cmd{color:var(--accent);font-family:var(--font-mono);font-size:.8125rem;background:var(--accent-soft);padding:1px 8px;border-radius:4px}
-.usage-card p{font-size:.8125rem;color:var(--text-secondary);margin-bottom:10px;line-height:1.65}
-.usage-card .cmd-line{font-family:var(--font-mono);font-size:.75rem;background:var(--bg-secondary);border-radius:6px;padding:10px 14px;overflow-x:auto;display:block;color:var(--text-primary);line-height:1.7}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.menu-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.menu-card h3{font-size:.9375rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.menu-card h3 .cmd{color:var(--accent);font-family:var(--font-mono);font-size:.8125rem;background:var(--accent-soft);padding:1px 8px;border-radius:4px}
+.menu-card p{font-size:.8125rem;color:var(--text-secondary);margin-bottom:10px;line-height:1.65}
+.menu-card .cmd-line{font-family:var(--font-mono);font-size:.75rem;background:var(--bg-secondary);border-radius:6px;padding:10px 14px;overflow-x:auto;display:block;color:var(--text-primary);line-height:1.7}
 .footer{border-top:1px solid var(--border);padding:40px 0;margin-top:40px}
 .footer-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .footer p{font-size:.8125rem;color:var(--text-tertiary)}
@@ -125,8 +101,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
   .comp-row.header{display:none}
   .cmd-block{flex-direction:column;align-items:stretch}
   .step{gap:14px}
-  .feature-grid{grid-template-columns:1fr}
-  .usage-grid{grid-template-columns:1fr}
+  .feature-grid,.menu-grid{grid-template-columns:1fr}
   .footer-inner{flex-direction:column;text-align:center}
 }
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -141,10 +116,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
 <div class="ambient-b"></div>
 <div class="container">
   <nav class="topbar">
-    <div class="logo">
-      <span class="logo-mark">P</span>
-      <span>Pig-NMP</span>
-    </div>
+    <div class="logo"><span class="logo-mark">P</span><span>Pig-NMP</span></div>
     <div class="lang-toggle" role="tablist">
       <button class="lang-btn active" data-lang="en" role="tab" aria-selected="true">EN</button>
       <button class="lang-btn" data-lang="zh" role="tab" aria-selected="false">中文</button>
@@ -153,7 +125,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
 </div>
 <section class="hero">
   <div class="container">
-    <div class="hero-label fade-up"><span class="hero-label-dot"></span> <span class="lang-en">v1.0.0 — Debian / Ubuntu</span><span class="lang-zh">v1.0.0 — Debian / Ubuntu</span></div>
+    <div class="hero-label fade-up"><span class="hero-label-dot"></span> <span class="lang-en">v1.1.0 — Debian / Ubuntu</span><span class="lang-zh">v1.1.0 — Debian / Ubuntu</span></div>
     <h1 class="fade-up" style="transition-delay:.1s">
       <span class="lang-en">Ship your stack with<br><em>one command</em></span>
       <span class="lang-zh"><em>一行命令</em><br>部署完整 Web 环境</span>
@@ -163,13 +135,8 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
       <span class="lang-zh">Nginx + MySQL/MariaDB + PHP 多版本管理。官方源编译，开箱即用，生产环境就绪。</span>
     </p>
     <div class="hero-actions fade-up" style="transition-delay:.3s">
-      <a class="btn btn-primary" href="#install">
-        <span class="btn-icon">↓</span>
-        <span class="lang-en">Get Started</span><span class="lang-zh">快速开始</span>
-      </a>
-      <a class="btn btn-secondary" href="#features">
-        <span class="lang-en">Features</span><span class="lang-zh">功能特性</span>
-      </a>
+      <a class="btn btn-primary" href="#install"><span class="btn-icon">↓</span><span class="lang-en">Get Started</span><span class="lang-zh">快速开始</span></a>
+      <a class="btn btn-secondary" href="#features"><span class="lang-en">Features</span><span class="lang-zh">功能特性</span></a>
     </div>
     <div style="margin-top:28px;transition-delay:.35s" class="fade-up">
       <div class="cmd-block">
@@ -198,7 +165,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
       <div class="feature-card fade-up" style="transition-delay:.1s">
         <div class="feature-icon">📦</div>
         <h3><span class="lang-en">Multi-Version PHP</span><span class="lang-zh">多版本 PHP</span></h3>
-        <p><span class="lang-en">8.1, 8.2, 8.3, 8.4 — side-by-side with independent php-fpm pools.</span><span class="lang-zh">8.1、8.2、8.3、8.4 并行运行，各自独立的 php-fpm 进程池。</span></p>
+        <p><span class="lang-en">8.1 through 8.5 — side-by-side with independent php-fpm pools.</span><span class="lang-zh">8.1 至 8.5 并行运行，各自独立的 php-fpm 进程池。</span></p>
       </div>
       <div class="feature-card fade-up" style="transition-delay:.15s">
         <div class="feature-icon">🔒</div>
@@ -207,8 +174,8 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
       </div>
       <div class="feature-card fade-up" style="transition-delay:.2s">
         <div class="feature-icon">🧩</div>
-        <h3><span class="lang-en">18+ PHP Extensions</span><span class="lang-zh">18+ PHP 扩展</span></h3>
-        <p><span class="lang-en">Redis, imagick, swoole, xdebug, grpc, mongodb, and more — install on demand.</span><span class="lang-zh">Redis、imagick、swoole、xdebug、grpc、mongodb 等，按需安装。</span></p>
+        <h3><span class="lang-en">20+ PHP Extensions</span><span class="lang-zh">20+ PHP 扩展</span></h3>
+        <p><span class="lang-en">Redis, imagick, swoole, xdebug, grpc, mongodb &amp; more — with FPM diagnostics.</span><span class="lang-zh">Redis、imagick、swoole、xdebug、grpc、mongodb 等，含 FPM 诊断工具。</span></p>
       </div>
       <div class="feature-card fade-up" style="transition-delay:.25s">
         <div class="feature-icon">🌐</div>
@@ -218,7 +185,7 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
       <div class="feature-card fade-up" style="transition-delay:.3s">
         <div class="feature-icon">🛡</div>
         <h3><span class="lang-en">Security Hardened</span><span class="lang-zh">安全加固</span></h3>
-        <p><span class="lang-en">Automatic MySQL/MariaDB secure init, UFW firewall presets, kernel parameter tuning.</span><span class="lang-zh">自动 MySQL/MariaDB 安全初始化、UFW 防火墙预设、内核参数调优。</span></p>
+        <p><span class="lang-en">Automatic MySQL/MariaDB secure init, kernel parameter tuning, defense-in-depth defaults.</span><span class="lang-zh">自动 MySQL/MariaDB 安全初始化、内核参数调优、纵深防御默认配置。</span></p>
       </div>
     </div>
   </div>
@@ -236,15 +203,10 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
         <span><span class="lang-en">Method</span><span class="lang-zh">方式</span></span>
       </div>
       <div class="comp-row"><span class="name">Nginx</span><span class="versions">1.26 (stable) / 1.27 (mainline)</span><span><span class="badge both">APT / Source</span></span></div>
-      <div class="comp-row"><span class="name">PHP</span><span class="versions">8.1 · 8.2 · 8.3 · 8.4</span><span><span class="badge src">Source</span></span></div>
+      <div class="comp-row"><span class="name">PHP</span><span class="versions">8.1 · 8.2 · 8.3 · 8.4 · 8.5</span><span><span class="badge both">APT SURY / Source</span></span></div>
       <div class="comp-row"><span class="name">MySQL</span><span class="versions">8.0 · 8.4 · 9.1</span><span><span class="badge apt">APT</span></span></div>
       <div class="comp-row"><span class="name">MariaDB</span><span class="versions">10.11 · 11.4 · 11.6</span><span><span class="badge apt">APT</span></span></div>
-      <div class="comp-row"><span class="name">Redis</span><span class="versions">8.0 (stable) / 8.6 (latest)</span><span><span class="badge both">APT / Source</span></span></div>
-      <div class="comp-row"><span class="name">Memcached</span><span class="versions">1.6.38</span><span><span class="badge src">Source</span></span></div>
-      <div class="comp-row"><span class="name">phpMyAdmin</span><span class="versions">5.2.2</span><span><span class="badge src">Download</span></span></div>
-      <div class="comp-row"><span class="name">vsftpd (FTP)</span><span class="versions">3.0.5</span><span><span class="badge both">APT / Source</span></span></div>
-      <div class="comp-row"><span class="name">ionCube Loader</span><span class="versions">latest</span><span><span class="badge src">Download</span></span></div>
-      <div class="comp-row"><span class="name">UFW Firewall</span><span class="versions">system default</span><span><span class="badge apt">APT</span></span></div>
+      <div class="comp-row"><span class="name">Redis</span><span class="versions">8.0+ (stable)</span><span><span class="badge both">APT / Source</span></span></div>
     </div>
   </div>
 </section>
@@ -283,16 +245,16 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
 <section class="section">
   <div class="container">
     <div class="section-header fade-up">
-      <h2><span class="lang-en">Command Reference</span><span class="lang-zh">命令参考</span></h2>
-      <p><span class="lang-en">Every component has its own management menu. Pass it as an argument.</span><span class="lang-zh">每个组件都有独立的管理菜单，作为参数传入即可。</span></p>
+      <h2><span class="lang-en">Main Menu</span><span class="lang-zh">主菜单</span></h2>
+      <p><span class="lang-en">Six core workflows — launch from one entry point.</span><span class="lang-zh">六大核心流程，统一入口启动。</span></p>
     </div>
-    <div class="usage-grid">
-      <div class="usage-card fade-up" style="transition-delay:.05s"><h3><span class="cmd">pig-nmp.sh</span></h3><p><span class="lang-en">Interactive main menu with status overview.</span><span class="lang-zh">交互式主菜单，显示组件状态总览。</span></p><code class="cmd-line">sudo bash pig-nmp.sh</code></div>
-      <div class="usage-card fade-up" style="transition-delay:.1s"><h3><span class="cmd">pig-nmp.sh nginx</span></h3><p><span class="lang-en">Install, configure, and manage Nginx.</span><span class="lang-zh">安装、配置和管理 Nginx。</span></p><code class="cmd-line">sudo bash pig-nmp.sh nginx</code></div>
-      <div class="usage-card fade-up" style="transition-delay:.15s"><h3><span class="cmd">pig-nmp.sh php</span></h3><p><span class="lang-en">Multi-version PHP management &amp; extension installer.</span><span class="lang-zh">多版本 PHP 管理及扩展安装。</span></p><code class="cmd-line">sudo bash pig-nmp.sh php</code></div>
-      <div class="usage-card fade-up" style="transition-delay:.2s"><h3><span class="cmd">pig-nmp.sh mysql</span></h3><p><span class="lang-en">MySQL/MariaDB install, secure, databases.</span><span class="lang-zh">MySQL/MariaDB 安装、安全配置、数据库管理。</span></p><code class="cmd-line">sudo bash pig-nmp.sh mysql</code></div>
-      <div class="usage-card fade-up" style="transition-delay:.25s"><h3><span class="cmd">pig-nmp.sh ssl</span></h3><p><span class="lang-en">Let's Encrypt or self-signed SSL certificates.</span><span class="lang-zh">Let's Encrypt 或自签 SSL 证书。</span></p><code class="cmd-line">sudo bash pig-nmp.sh ssl</code></div>
-      <div class="usage-card fade-up" style="transition-delay:.3s"><h3><span class="cmd">pig-nmp.sh status</span></h3><p><span class="lang-en">Dashboard: OS, services, ports, resource usage.</span><span class="lang-zh">系统面板：操作系统、服务状态、端口、资源使用。</span></p><code class="cmd-line">sudo bash pig-nmp.sh status</code></div>
+    <div class="menu-grid">
+      <div class="menu-card fade-up" style="transition-delay:.05s"><h3><span class="cmd">1</span><span class="lang-en">Install / Update Components</span><span class="lang-zh">安装 / 更新组件</span></h3><p><span class="lang-en">Add or upgrade Nginx, PHP, MySQL, MariaDB, Redis.</span><span class="lang-zh">添加或升级 Nginx、PHP、MySQL、MariaDB、Redis。</span></p><code class="cmd-line">sudo bash pig-nmp.sh</code></div>
+      <div class="menu-card fade-up" style="transition-delay:.1s"><h3><span class="cmd">2</span><span class="lang-en">Manage Virtual Hosts</span><span class="lang-zh">管理虚拟主机</span></h3><p><span class="lang-en">Create, list, delete vhosts with PHP version &amp; SSL selection.</span><span class="lang-zh">创建、列出、删除虚拟主机，选择 PHP 版本和 SSL。</span></p><code class="cmd-line">sudo bash pig-nmp.sh vhost</code></div>
+      <div class="menu-card fade-up" style="transition-delay:.15s"><h3><span class="cmd">3</span><span class="lang-en">Configure SSL Certificates</span><span class="lang-zh">配置 SSL 证书</span></h3><p><span class="lang-en">Let's Encrypt or self-signed — issue, renew, revoke.</span><span class="lang-zh">Let's Encrypt 或自签证书 — 签发、续签、吊销。</span></p><code class="cmd-line">sudo bash pig-nmp.sh ssl</code></div>
+      <div class="menu-card fade-up" style="transition-delay:.2s"><h3><span class="cmd">4</span><span class="lang-en">PHP Version &amp; Extensions</span><span class="lang-zh">PHP 版本与扩展管理</span></h3><p><span class="lang-en">Switch PHP versions, install 20+ extensions, FPM diagnostics.</span><span class="lang-zh">切换 PHP 版本、安装 20+ 扩展、FPM 诊断。</span></p><code class="cmd-line">sudo bash pig-nmp.sh php</code></div>
+      <div class="menu-card fade-up" style="transition-delay:.25s"><h3><span class="cmd">5</span><span class="lang-en">System Status &amp; Manager</span><span class="lang-zh">系统状态与管理</span></h3><p><span class="lang-en">Dashboard: services, ports, resources, logs.</span><span class="lang-zh">面板：服务状态、端口、资源、日志。</span></p><code class="cmd-line">sudo bash pig-nmp.sh status</code></div>
+      <div class="menu-card fade-up" style="transition-delay:.3s"><h3><span class="cmd">6</span><span class="lang-en">Uninstall Components</span><span class="lang-zh">卸载组件</span></h3><p><span class="lang-en">Clean removal of any installed component.</span><span class="lang-zh">彻底卸载已安装的组件。</span></p><code class="cmd-line">sudo bash pig-nmp.sh uninstall</code></div>
     </div>
   </div>
 </section>
@@ -309,37 +271,20 @@ pre{font-family:var(--font-mono);font-size:.8125rem;line-height:1.7;overflow-x:a
   </div>
 </footer>
 <script>
-(function() {
-  const root = document.documentElement;
-  const btns = document.querySelectorAll('.lang-btn');
-  btns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const lang = btn.dataset.lang;
-      btns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-      btn.classList.add('active');
-      btn.setAttribute('aria-selected', 'true');
-      root.setAttribute('data-lang', lang);
+(function(){
+  var root=document.documentElement,btns=document.querySelectorAll('.lang-btn');
+  btns.forEach(function(b){b.addEventListener('click',function(){
+    btns.forEach(function(x){x.classList.remove('active');x.setAttribute('aria-selected','false')});
+    b.classList.add('active');b.setAttribute('aria-selected','true');root.setAttribute('data-lang',b.dataset.lang);
+  })});
+  document.querySelectorAll('.copy-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t=b.dataset.cmd;if(!t||!navigator.clipboard)return;
+      navigator.clipboard.writeText(t).then(function(){b.classList.add('copied');setTimeout(function(){b.classList.remove('copied')},1800)});
     });
   });
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const text = btn.dataset.cmd;
-      if (!text || !navigator.clipboard) return;
-      navigator.clipboard.writeText(text).then(() => {
-        btn.classList.add('copied');
-        setTimeout(() => btn.classList.remove('copied'), 1800);
-      });
-    });
-  });
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  var o=new IntersectionObserver(function(e){e.forEach(function(x){if(x.isIntersecting){x.target.classList.add('visible');o.unobserve(x.target)}})},{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.fade-up').forEach(function(el){o.observe(el)});
 })();
 </script>
 </body>
