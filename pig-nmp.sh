@@ -220,6 +220,14 @@ cmd_purge() {
     apt_remove mysql-server mysql-client mysql-common mariadb-server mariadb-client mariadb-common 2>/dev/null || true
     apt_remove redis-server redis-tools memcached vsftpd 2>/dev/null || true
 
+    local -a php_pkgs=()
+    while IFS= read -r pkg; do
+        [[ -n "$pkg" ]] && php_pkgs+=("$pkg")
+    done < <(dpkg -l 2>/dev/null | awk '/^ii[[:space:]]+php[0-9]+\.[0-9]+/{print $2}')
+    if [[ ${#php_pkgs[@]} -gt 0 ]]; then
+        DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq "${php_pkgs[@]}" 2>/dev/null || true
+    fi
+
     rm -f /etc/systemd/system/nginx.service /etc/systemd/system/php*-fpm*.service
     rm -f /etc/systemd/system/redis.service /etc/systemd/system/memcached.service
     rm -f /etc/systemd/system/vsftpd.service /etc/systemd/system/mysqld.service

@@ -23,9 +23,9 @@ mysql_get_version() {
     local type
     type=$(mysql_get_type)
     if [[ "$type" == "mariadb" ]]; then
-        mariadb --version 2>/dev/null | grep -oP 'Ver\s+\K[\d.]+' | head -1
+        mariadb --version 2>/dev/null | grep -oP 'Distrib\s+\K[\d.]+' | head -1
     elif [[ "$type" == "mysql" ]]; then
-        mysql --version 2>/dev/null | grep -oP 'Ver\s+\K[\d.]+' | head -1
+        mysql --version 2>/dev/null | grep -oP 'Distrib\s+\K[\d.]+' | head -1
     fi
 }
 

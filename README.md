@@ -909,11 +909,7 @@ apt remove --purge nginx mysql-server mariadb-server vsftpd ufw -y
 
 <div align="center">
 
----
-
-# 🐷 Pig-NMP 中文说明
-
----
+# Pig-NMP 中文说明
 
 </div>
 
