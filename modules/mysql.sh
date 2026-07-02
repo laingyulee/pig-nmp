@@ -54,7 +54,7 @@ mysql_install_mysql() {
     ensure_dirs "$TMP_DIR"
 
     log_info "Setting up MySQL APT repository..."
-    download_file "https://dev.mysql.com/get/${deb_config_url:-mysql-apt-config_0.8.33-1_all.deb}" "$tmp_deb" || {
+    download_file "https://dev.mysql.com/get/${deb_pkg}" "$tmp_deb" || {
         log_error "Failed to download MySQL APT config"; return 1
     }
 

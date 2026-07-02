@@ -225,7 +225,8 @@ php_ext_enable() {
         for sapi in fpm cli; do
             local conf_d="/etc/php/${ver}/${sapi}/conf.d"
             ensure_dirs "$conf_d"
-            [[ -e "${conf_d}/$(ls "${conf_d}" 2>/dev/null | grep -oP '\d+(?=-'"${ext}"')' | head -1)-${ext}.ini" ]] && continue
+            # 检查是否已存在该扩展的配置文件
+            [[ -e "${conf_d}/20-${ext}.ini" ]] && continue
             ln -sf "$conf_file" "${conf_d}/20-${ext}.ini"
         done
     else
