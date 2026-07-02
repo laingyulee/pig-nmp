@@ -4,11 +4,26 @@
 #
 
 PHP_EXT_AVAILABLE=(
+    "pdo:PDO database abstraction (usually built-in)"
+    "pdo_mysql:PDO MySQL driver"
+    "pdo_pgsql:PDO PostgreSQL driver"
+    "pdo_sqlite:PDO SQLite driver"
+    "mysqli:MySQL improved extension"
+    "mbstring:Multi-byte string handling"
+    "curl:cURL transfer library"
+    "fileinfo:File type detection (usually built-in)"
+    "xml:XML parsing"
+    "xmlwriter:XML writing"
+    "xmlreader:XML reading"
+    "zip:ZIP archive support"
+    "bcmath:Binary calculator"
+    "gd:GD image processing"
+    "intl:Internationalization"
+    "soap:SOAP protocol"
+    "opcache:OPcache (usually built-in)"
     "imagick:Image processing (requires ImageMagick)"
     "redis:Redis client"
     "memcached:Memcached client (requires libmemcached-dev)"
-    "gd:GD image processing"
-    "intl:Internationalization"
     "mongodb:MongoDB client"
     "swoole:Async/coroutine framework"
     "mcrypt:MCrypt encryption (deprecated, use OpenSSL)"
@@ -16,7 +31,6 @@ PHP_EXT_AVAILABLE=(
     "xdebug:Debug/profiler"
     "grpc:gRPC framework"
     "protobuf:Protocol Buffers"
-    "opcache:OPcache (usually built-in)"
     "excimer:Profiling timer"
     "rdkafka:Kafka client"
     "amqp:AMQP protocol"
@@ -84,6 +98,9 @@ php_ext_install() {
     if php_ext_is_installed "$ext" "$ver"; then
         log_warn "Extension '${ext}' is already installed for PHP ${ver}"
         if ! confirm "Reinstall?"; then
+            # Still restart FPM to ensure it's loaded
+            systemctl restart "php${ver}-fpm" &>/dev/null
+            log_info "PHP-FPM restarted to ensure '${ext}' is loaded"
             return 0
         fi
     fi
@@ -178,9 +195,88 @@ php_ext_install() {
             log_info "OPcache is usually built-in. Enabling..."
             php_ext_enable "opcache" "$ver"
             ;;
+        pdo|mysqli|mbstring|curl|fileinfo|xml|xmlwriter|xmlreader|zip|bcmath|soap|pgsql|sqlite3|bz2|gmp|exif|gettext|sockets|pcntl|sodium|opcache)
+            # Core extensions: check if already built-in
+            if php_ext_is_installed "$ext" "$ver"; then
+                log_info "Extension '${ext}' is already enabled for PHP ${ver}"
+                systemctl restart "php${ver}-fpm" &>/dev/null
+                return 0
+            fi
+            local method
+            method=$(php_install_method "$ver")
+            if [[ "$method" == "apt" ]]; then
+                # Install the corresponding APT package
+                local pkg="php${ver}-${ext}"
+                if apt-cache show "$pkg" &>/dev/null; then
+                    install_deps "$pkg"
+                else
+                    log_warn "Package ${pkg} not found in repository"
+                    log_info "Extension '${ext}' may be built into PHP ${ver}"
+                fi
+            else
+                log_info "Extension '${ext}' is usually built-in for source-compiled PHP"
+                log_info "If not available, recompile PHP with the appropriate --enable/--with option"
+            fi
+            ;;
+        pdo_mysql)
+            if php_ext_is_installed "pdo_mysql" "$ver"; then
+                log_info "Extension 'pdo_mysql' is already enabled for PHP ${ver}"
+                systemctl restart "php${ver}-fpm" &>/dev/null
+                return 0
+            fi
+            local method
+            method=$(php_install_method "$ver")
+            if [[ "$method" == "apt" ]]; then
+                local pkg="php${ver}-mysql"
+                if apt-cache show "$pkg" &>/dev/null; then
+                    install_deps "$pkg"
+                fi
+            else
+                log_info "pdo_mysql is usually built-in for source-compiled PHP (compiled with --with-pdo-mysql)"
+            fi
+            ;;
+        pdo_pgsql)
+            if php_ext_is_installed "pdo_pgsql" "$ver"; then
+                log_info "Extension 'pdo_pgsql' is already enabled for PHP ${ver}"
+                systemctl restart "php${ver}-fpm" &>/dev/null
+                return 0
+            fi
+            local method
+            method=$(php_install_method "$ver")
+            if [[ "$method" == "apt" ]]; then
+                local pkg="php${ver}-pgsql"
+                if apt-cache show "$pkg" &>/dev/null; then
+                    install_deps "$pkg"
+                fi
+            else
+                log_info "pdo_pgsql requires --with-pdo-pgsql at compile time"
+            fi
+            ;;
+        pdo_sqlite)
+            if php_ext_is_installed "pdo_sqlite" "$ver"; then
+                log_info "Extension 'pdo_sqlite' is already enabled for PHP ${ver}"
+                systemctl restart "php${ver}-fpm" &>/dev/null
+                return 0
+            fi
+            local method
+            method=$(php_install_method "$ver")
+            if [[ "$method" == "apt" ]]; then
+                local pkg="php${ver}-sqlite3"
+                if apt-cache show "$pkg" &>/dev/null; then
+                    install_deps "$pkg"
+                fi
+            else
+                log_info "pdo_sqlite is usually built-in for source-compiled PHP"
+            fi
+            ;;
         fileinfo)
+            if php_ext_is_installed "fileinfo" "$ver"; then
+                log_info "Extension 'fileinfo' is already enabled for PHP ${ver}"
+                systemctl restart "php${ver}-fpm" &>/dev/null
+                return 0
+            fi
             log_info "fileinfo is usually built-in during PHP compilation"
-            log_info "If not available, you may need to recompile PHP with --enable-fileinfo"
+            log_info "If not available, recompile PHP with --enable-fileinfo"
             ;;
         *)
             log_info "Trying to install '${ext}' via PECL..."
@@ -439,6 +535,98 @@ php_ext_batch_install() {
     done
 }
 
+php_ext_diagnose() {
+    local ver="$1"
+    if [[ -z "$ver" ]]; then
+        ver=$(php_select_version)
+        [[ -z "$ver" ]] && return 1
+    fi
+
+    if ! php_is_installed "$ver"; then
+        log_error "PHP ${ver} is not installed"
+        return 1
+    fi
+
+    local php_bin="${PHP_BASE_DIR}/php${ver}/bin/php"
+    local method
+    method=$(php_install_method "$ver")
+
+    echo -e "\n${HEADER_COLOR}=== PHP ${ver} Extension Diagnostics ===${C_RESET}"
+
+    echo -e "\n  ${C_BOLD}PHP Binary:${C_RESET}"
+    echo -e "    Path:     ${php_bin}"
+    if [[ -L "$php_bin" ]]; then
+        echo -e "    Target:   $(readlink -f "$php_bin")"
+    fi
+    echo -e "    Version:  $("$php_bin" -v 2>/dev/null | head -1)"
+    echo -e "    Method:   ${method}"
+
+    echo -e "\n  ${C_BOLD}Configuration Paths:${C_RESET}"
+    local cli_ini
+    cli_ini=$("$php_bin" -r "echo php_ini_loaded_file();" 2>/dev/null)
+    echo -e "    Loaded ini: ${cli_ini:-none}"
+
+    local cli_ini_scanned
+    cli_ini_scanned=$("$php_bin" -r "echo php_ini_scanned_dir();" 2>/dev/null)
+    echo -e "    Scanned dir: ${cli_ini_scanned:-none}"
+
+    echo -e "\n  ${C_BOLD}FPM Configuration:${C_RESET}"
+    local fpm_ini="/etc/php/${ver}/fpm/php.ini"
+    local fpm_conf_d="/etc/php/${ver}/fpm/conf.d"
+    if [[ "$method" == "apt" ]]; then
+        echo -e "    FPM php.ini:  ${fpm_ini}"
+        echo -e "    FPM conf.d:   ${fpm_conf_d}"
+        if [[ -d "$fpm_conf_d" ]]; then
+            local count
+            count=$(ls -1 "$fpm_conf_d" 2>/dev/null | wc -l)
+            echo -e "    conf.d files: ${count}"
+        fi
+    else
+        echo -e "    Source-compiled PHP uses: ${PHP_ETC_DIR}/php${ver}/php.ini"
+    fi
+
+    echo -e "\n  ${C_BOLD}FPM Service:${C_RESET}"
+    if is_service_active "php${ver}-fpm"; then
+        echo -e "    Status: ${C_GREEN}running${C_RESET}"
+    else
+        echo -e "    Status: ${C_RED}stopped${C_RESET}"
+    fi
+
+    echo -e "\n  ${C_BOLD}Checking required extensions:${C_RESET}"
+    local -a required_exts=(pdo pdo_mysql mysqli mbstring curl fileinfo xml zip)
+    for ext in "${required_exts[@]}"; do
+        local cli_loaded="no"
+        local fpm_loaded="no"
+
+        # Check CLI
+        if "$php_bin" -m 2>/dev/null | grep -qi "^${ext}$"; then
+            cli_loaded="${C_GREEN}yes${C_RESET}"
+        else
+            cli_loaded="${C_RED}no${C_RESET}"
+        fi
+
+        # Check FPM config (if APT, check if ini exists in conf.d)
+        if [[ "$method" == "apt" ]] && [[ -d "$fpm_conf_d" ]]; then
+            if ls "$fpm_conf_d"/*"${ext}"* &>/dev/null 2>&1; then
+                fpm_loaded="${C_GREEN}yes${C_RESET} (conf.d)"
+            elif grep -rq "extension=${ext}" "$fpm_ini" 2>/dev/null; then
+                fpm_loaded="${C_GREEN}yes${C_RESET} (php.ini)"
+            else
+                fpm_loaded="${C_RED}no${C_RESET}"
+            fi
+        else
+            fpm_loaded="(source - same as CLI)"
+        fi
+
+        printf "    %-15s CLI: %-20b FPM: %b\n" "$ext" "$cli_loaded" "$fpm_loaded"
+    done
+
+    echo -e "\n  ${C_BOLD}Quick Fix:${C_RESET}"
+    echo -e "    If FPM shows 'no' for required extensions, run:"
+    echo -e "    ${C_CYAN}systemctl restart php${ver}-fpm${C_RESET}"
+    echo ""
+}
+
 php_ext_menu() {
     while true; do
         echo -e "\n${HEADER_COLOR}=== PHP Extension Management ===${C_RESET}"
@@ -447,6 +635,7 @@ php_ext_menu() {
         echo -e "  ${MENU_NUM_COLOR}3)${C_RESET} List installed extensions"
         echo -e "  ${MENU_NUM_COLOR}4)${C_RESET} List available extensions"
         echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Batch install common extensions"
+        echo -e "  ${MENU_NUM_COLOR}6)${C_RESET} Diagnose extensions (check FPM loading)"
         echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
         echo ""
 
@@ -482,6 +671,11 @@ php_ext_menu() {
                 local ver
                 ver=$(php_select_version)
                 [[ -n "$ver" ]] && php_ext_batch_install "$ver"
+                ;;
+            6)
+                local ver
+                ver=$(php_select_version)
+                [[ -n "$ver" ]] && php_ext_diagnose "$ver"
                 ;;
             0) return 0 ;;
             *) log_warn "Invalid choice" ;;

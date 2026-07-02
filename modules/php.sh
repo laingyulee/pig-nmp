@@ -149,16 +149,16 @@ php_install_apt() {
     local -a all_pkgs=(
         "${p}"           "${p}-common"
         "${p}-cli"       "${p}-fpm"
-        "${p}-mysql"     "${p}-curl"
-        "${p}-mbstring"  "${p}-xml"
-        "${p}-gd"        "${p}-intl"
-        "${p}-zip"       "${p}-bcmath"
-        "${p}-opcache"   "${p}-readline"
-        "${p}-soap"      "${p}-bz2"
-        "${p}-sqlite3"   "${p}-gmp"
-        "${p}-exif"      "${p}-gettext"
-        "${p}-sockets"   "${p}-pcntl"
-        "${p}-sodium"
+        "${p}-mysql"     "${p}-pdo-mysql"
+        "${p}-curl"      "${p}-mbstring"
+        "${p}-xml"       "${p}-gd"
+        "${p}-intl"      "${p}-zip"
+        "${p}-bcmath"    "${p}-opcache"
+        "${p}-readline"  "${p}-soap"
+        "${p}-bz2"       "${p}-sqlite3"
+        "${p}-gmp"       "${p}-exif"
+        "${p}-gettext"   "${p}-sockets"
+        "${p}-pcntl"     "${p}-sodium"
     )
 
     local -a extra_pkgs=(
@@ -357,6 +357,7 @@ php_install_source() {
         --with-sodium
         --with-password-argon2
         --with-pear
+        --enable-phar
         --enable-phpdbg
         --with-ldap
         --with-ldap-sasl
@@ -667,6 +668,7 @@ php_menu() {
         echo -e "  ${MENU_NUM_COLOR}5)${C_RESET} Start/Stop/Restart php-fpm"
         echo -e "  ${MENU_NUM_COLOR}6)${C_RESET} Tune php-fpm settings"
         echo -e "  ${MENU_NUM_COLOR}7)${C_RESET} Status"
+        echo -e "  ${MENU_NUM_COLOR}8)${C_RESET} Install Composer"
         echo -e "  ${MENU_NUM_COLOR}0)${C_RESET} Back"
         echo ""
 
@@ -697,10 +699,92 @@ php_menu() {
                 [[ -n "$ver" ]] && php_tune_fpm "$ver"
                 ;;
             7) php_status ;;
+            8) php_install_composer ;;
             0) return 0 ;;
             *) log_warn "Invalid choice" ;;
         esac
     done
+}
+
+php_install_composer() {
+    local ver="${1:-}"
+    if [[ -z "$ver" ]]; then
+        if ! ver=$(php_select_version); then
+            return 1
+        fi
+    fi
+
+    local php_bin="${PHP_BASE_DIR}/php${ver}/bin/php"
+    if [[ ! -x "$php_bin" ]]; then
+        log_error "PHP ${ver} binary not found: ${php_bin}"
+        return 1
+    fi
+
+    if ! "$php_bin" -m 2>/dev/null | grep -qi '^phar$'; then
+        log_warn "PHP ${ver} does not have the phar extension enabled"
+        log_info "Attempting to enable phar for PHP ${ver}..."
+        local method
+        method=$(php_install_method "$ver")
+        if [[ "$method" == "apt" ]]; then
+            # Try installing phar package for APT-installed PHP
+            local pkg="php${ver}-phar"
+            if apt-cache show "$pkg" &>/dev/null; then
+                install_deps "$pkg"
+            fi
+        fi
+        # Try enabling phar in php.ini (works for both APT and source)
+        local php_ini
+        php_ini=$(php_get_ini_path "$ver" 2>/dev/null)
+        if [[ -f "$php_ini" ]]; then
+            if ! grep -q '^extension=phar' "$php_ini" 2>/dev/null; then
+                echo "extension=phar" >> "$php_ini"
+                log_info "Added extension=phar to ${php_ini}"
+            fi
+        fi
+        # Re-check after enabling
+        if ! "$php_bin" -m 2>/dev/null | grep -qi '^phar$'; then
+            log_error "Could not enable phar for PHP ${ver}. Please enable it manually."
+            return 1
+        fi
+    fi
+
+    local composer_bin="/usr/local/bin/composer${ver}"
+    if [[ -x "$composer_bin" ]]; then
+        log_warn "Composer is already installed: $("$composer_bin" --version 2>/dev/null)"
+        if ! confirm "Reinstall Composer for PHP ${ver}?"; then
+            return 0
+        fi
+    fi
+
+    log_info "Installing Composer for PHP ${ver}..."
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    curl -fsSL https://getcomposer.org/installer -o "${tmp_dir}/installer.php" || {
+        log_error "Failed to download Composer installer"
+        rm -rf "$tmp_dir"
+        return 1
+    }
+
+    "$php_bin" "${tmp_dir}/installer.php" --install-dir="$tmp_dir" --filename=composer 2>&1 | tail -5 || {
+        log_error "Composer installation failed"
+        rm -rf "$tmp_dir"
+        return 1
+    }
+
+    mv "${tmp_dir}/composer" "$composer_bin"
+    chmod +x "$composer_bin"
+    rm -rf "$tmp_dir"
+
+    if "$composer_bin" --version &>/dev/null; then
+        log_success "Composer installed: $("$composer_bin" --version)"
+        if [[ ! -L /usr/local/bin/composer ]] && [[ ! -f /usr/local/bin/composer ]]; then
+            ln -sf "$composer_bin" /usr/local/bin/composer
+            log_info "Symlinked /usr/local/bin/composer -> ${composer_bin}"
+        fi
+    else
+        log_error "Composer verification failed"
+        return 1
+    fi
 }
 
 php_select_version() {
